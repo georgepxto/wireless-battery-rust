@@ -3,8 +3,10 @@
 ## renanleonel/windows-taskbar-battery (MIT)
 https://github.com/renanleonel/windows-taskbar-battery
 
-`src/logitech/` (HID++), `src/bluetooth.rs`, `src/xbox.rs` e `src/device.rs` vêm desse projeto,
-com pequenas adaptações (textos em português, estado "carregando sem porcentagem").
+`src/logitech/` (HID++), `src/bluetooth.rs`, `src/xbox.rs`, `src/device.rs`, `src/widget.rs`,
+`src/render.rs`, `src/notify.rs`, `src/settings.rs` e o manifesto em `res/` vêm desse projeto,
+com adaptações (textos em português, modo "somente um", estado "carregando sem porcentagem",
+fonte de ícones do Windows 10).
 
 ```
 MIT License

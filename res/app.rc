@@ -1,0 +1,24 @@
+// Recursos do executavel. Gerar de novo (Linux/MSYS2):
+//   x86_64-w64-mingw32-windres app.rc -O coff -o resources.o
+#include <winuser.h>
+1 ICON "app.ico"
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "app.manifest"
+1 VERSIONINFO
+FILEVERSION 0,3,0,0
+PRODUCTVERSION 0,3,0,0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "041604B0"
+    BEGIN
+      VALUE "FileDescription", "Wireless Battery"
+      VALUE "ProductName", "Wireless Battery"
+      VALUE "FileVersion", "0.3.0"
+      VALUE "ProductVersion", "0.3.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0416, 1200
+  END
+END
