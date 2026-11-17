@@ -18,7 +18,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows_sys::Win32::System::Threading::CreateMutexW;
+use windows_sys::Win32::System::Threading::{CreateMutexW, GetCurrentProcess, SetProcessWorkingSetSize};
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::HiDpi::*;
 use windows_sys::Win32::UI::Shell::{
@@ -170,6 +170,7 @@ fn worker(controller: usize, rx: Receiver<()>) {
             alerts.check(&readings);
             *READINGS.lock().unwrap() = Some(readings);
             unsafe { PostMessageW(controller as HWND, WM_APP_UPDATE, 0, 0) };
+            trim_working_set();
             if was_paused {
                 wait = POLL;
             }
@@ -190,6 +191,13 @@ fn worker(controller: usize, rx: Receiver<()>) {
             wait = POLL;
         }
     }
+}
+
+/// O app fica parado entre as leituras: devolve a memoria ao Windows ate a proxima.
+/// As paginas vao para a lista de espera e voltam rapido quando usadas.
+/// (renanleonel/windows-taskbar-battery, MIT)
+fn trim_working_set() {
+    unsafe { SetProcessWorkingSetSize(GetCurrentProcess(), usize::MAX, usize::MAX) };
 }
 
 /// Jogo em tela cheia (exclusiva ou sem bordas), apresentacao ou outro app em tela cheia.

@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Rust (GNU)
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal --component clippy
+          rustup override set stable-x86_64-pc-windows-gnu
+
+      - name: Testes
+        run: cargo test --locked
+
+      - name: Clippy
+        run: cargo clippy --all-targets --features probe,snapshot --locked -- -D warnings
+
+      - name: Build de release
+        run: cargo build --release --locked

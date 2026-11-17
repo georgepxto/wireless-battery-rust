@@ -8,6 +8,8 @@ https://github.com/renanleonel/windows-taskbar-battery
 e o manifesto em `res/` vêm desse projeto,
 com adaptações (textos em português, modo "somente um", estado "carregando sem porcentagem",
 fonte de ícones do Windows 10).
+Também vêm dele a leitura de Bluetooth só pela SetupAPI, a devolução de memória ao Windows entre
+as leituras e os testes do leitor Logitech com um receptor HID++ simulado.
 
 ```
 MIT License

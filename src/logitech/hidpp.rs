@@ -53,13 +53,34 @@ pub struct Endpoint {
     pub pid: u16,
     pub iface: i32,
     pub product: String,
-    short: Option<CString>,
-    long: CString,
+    pub(super) short: Option<CString>,
+    pub(super) long: CString,
+}
+
+/// One HID top-level collection as reported by the OS (a plain-data view of `DeviceInfo`).
+pub struct Collection {
+    pub pid: u16,
+    pub iface: i32,
+    pub product: String,
+    pub usage_page: u16,
+    pub usage: u16,
+    pub path: CString,
 }
 
 /// Groups Logitech vendor-defined HID collections by interface, keeping those that accept
 /// long (HID++ 2.0) reports.
 pub fn endpoints(api: &HidApi) -> Vec<Endpoint> {
+    group_collections(api.device_list().filter(|d| d.vendor_id() == LOGITECH_VID).map(|d| Collection {
+        pid: d.product_id(),
+        iface: d.interface_number(),
+        product: d.product_string().unwrap_or_default().trim().to_string(),
+        usage_page: d.usage_page(),
+        usage: d.usage(),
+        path: d.path().to_owned(),
+    }))
+}
+
+fn group_collections(collections: impl IntoIterator<Item = Collection>) -> Vec<Endpoint> {
     struct Partial {
         pid: u16,
         iface: i32,
@@ -68,23 +89,17 @@ pub fn endpoints(api: &HidApi) -> Vec<Endpoint> {
         long: Option<CString>,
     }
     let mut groups: Vec<Partial> = Vec::new();
-    for d in api.device_list().filter(|d| d.vendor_id() == LOGITECH_VID && d.usage_page() >= 0xFF00) {
-        let i = match groups.iter().position(|g| g.pid == d.product_id() && g.iface == d.interface_number()) {
+    for d in collections.into_iter().filter(|d| d.usage_page >= 0xFF00) {
+        let i = match groups.iter().position(|g| g.pid == d.pid && g.iface == d.iface) {
             Some(i) => i,
             None => {
-                groups.push(Partial {
-                    pid: d.product_id(),
-                    iface: d.interface_number(),
-                    product: d.product_string().unwrap_or_default().trim().to_string(),
-                    short: None,
-                    long: None,
-                });
+                groups.push(Partial { pid: d.pid, iface: d.iface, product: d.product, short: None, long: None });
                 groups.len() - 1
             }
         };
-        match d.usage() & 0xFF {
-            0x01 => groups[i].short = Some(d.path().to_owned()),
-            0x02 => groups[i].long = Some(d.path().to_owned()),
+        match d.usage & 0xFF {
+            0x01 => groups[i].short = Some(d.path),
+            0x02 => groups[i].long = Some(d.path),
             _ => {}
         }
     }
@@ -92,6 +107,19 @@ pub fn endpoints(api: &HidApi) -> Vec<Endpoint> {
         .into_iter()
         .filter_map(|g| Some(Endpoint { pid: g.pid, iface: g.iface, product: g.product, short: g.short, long: g.long? }))
         .collect()
+}
+
+/// A HID++ 2.0 request/response channel. `Link` is the real one; tests use a scripted fake.
+pub trait Hidpp {
+    /// Sends a request to device `index` (1..=6 behind a receiver, 0xFF for a direct device)
+    /// and waits for the matching reply; returns its 16 parameter bytes.
+    fn request(&self, index: u8, feature_idx: u8, function: u8, params: &[u8]) -> Result<[u8; 16], Error>;
+
+    /// Root feature lookup: maps a feature id (e.g. 0x1001) to its index on the device.
+    fn feature_index(&self, index: u8, feature: u16) -> Result<Option<u8>, Error> {
+        let r = self.request(index, 0x00, 0x0, &feature.to_be_bytes())?;
+        Ok((r[0] != 0).then_some(r[0]))
+    }
 }
 
 pub struct Link {
@@ -106,9 +134,10 @@ impl Link {
         Ok(Self { short, long })
     }
 
-    /// Sends a request to device `index` (1..=6 behind a receiver, 0xFF for a direct device)
-    /// and waits for the matching reply; returns its 16 parameter bytes.
-    pub fn request(&self, index: u8, feature_idx: u8, function: u8, params: &[u8]) -> Result<[u8; 16], Error> {
+}
+
+impl Hidpp for Link {
+    fn request(&self, index: u8, feature_idx: u8, function: u8, params: &[u8]) -> Result<[u8; 16], Error> {
         let func_sw = (function << 4) | SW_ID;
         let mut tx = [0u8; LEN_LONG];
         tx[0] = REPORT_LONG;
@@ -146,12 +175,6 @@ impl Link {
             }
         }
     }
-
-    /// Root feature lookup: maps a feature id (e.g. 0x1001) to its index on the device.
-    pub fn feature_index(&self, index: u8, feature: u16) -> Result<Option<u8>, Error> {
-        let r = self.request(index, 0x00, 0x0, &feature.to_be_bytes())?;
-        Ok((r[0] != 0).then_some(r[0]))
-    }
 }
 
 /// Matches a report against our pending request.
@@ -170,4 +193,54 @@ fn reply(rx: &[u8], index: u8, feature_idx: u8, func_sw: u8) -> Option<Result<[u
         return Some(Ok(out));
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn col(pid: u16, iface: i32, page: u16, usage: u16, path: &str) -> Collection {
+        Collection { pid, iface, product: "G733 Gaming Headset".into(), usage_page: page, usage, path: CString::new(path).unwrap() }
+    }
+
+    // G733 dongle as documented by HeadsetControl (usage page 0xFF43, usage 0x0202 for HID++
+    // long reports). The exact collection list is not captured from a real device.
+    #[test]
+    fn g733_long_collection_alone_is_an_endpoint() {
+        for pid in [0x0AB5, 0x0AFE, 0x0B1F] {
+            let eps = group_collections([col(pid, 3, 0xFF43, 0x0202, "long")]);
+            assert_eq!(eps.len(), 1, "pid {pid:04x}");
+            assert_eq!((eps[0].pid, eps[0].iface), (pid, 3));
+            assert!(eps[0].short.is_none());
+        }
+    }
+
+    #[test]
+    fn short_and_long_collections_are_paired() {
+        let eps = group_collections([col(0xC52B, 2, 0xFF00, 0x0001, "short"), col(0xC52B, 2, 0xFF00, 0x0002, "long")]);
+        assert_eq!(eps.len(), 1);
+        assert_eq!(eps[0].short.as_deref().map(|p| p.to_str().unwrap()), Some("short"));
+        assert_eq!(eps[0].long.to_str().unwrap(), "long");
+    }
+
+    #[test]
+    fn standard_hid_collections_are_ignored() {
+        // Keyboard/consumer pages (< 0xFF00) never count, even with a "long" usage.
+        assert!(group_collections([col(0x0AB5, 0, 0x000C, 0x0001, "consumer"), col(0x0AB5, 0, 0x0001, 0x0002, "mouse")]).is_empty());
+    }
+
+    #[test]
+    fn vendor_collection_without_long_usage_is_dropped() {
+        assert!(group_collections([col(0x0AB5, 3, 0xFF43, 0x0001, "short only")]).is_empty());
+    }
+
+    #[test]
+    fn interfaces_and_pids_are_grouped_separately() {
+        let eps = group_collections([
+            col(0x0AB5, 3, 0xFF43, 0x0202, "a"),
+            col(0x0AB5, 4, 0xFF43, 0x0202, "b"),
+            col(0x0AFE, 3, 0xFF43, 0x0202, "c"),
+        ]);
+        assert_eq!(eps.len(), 3);
+    }
 }

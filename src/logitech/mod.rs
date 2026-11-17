@@ -6,7 +6,7 @@ pub mod hidpp;
 
 use crate::device::{Kind, Observation, State};
 use hidapi::HidApi;
-use hidpp::{Endpoint, Error, Link, ERR_UNKNOWN_DEVICE};
+use hidpp::{Endpoint, Error, Hidpp, Link, ERR_UNKNOWN_DEVICE};
 use std::collections::HashMap;
 
 /// Known receiver PIDs (Unifying, Nano, Lightspeed, Bolt). Anything named "Receiver" also counts.
@@ -50,7 +50,15 @@ impl Logitech {
     pub fn scan(&mut self, api: &HidApi) -> Vec<Observation> {
         let mut out = Vec::new();
         for ep in hidpp::endpoints(api) {
-            let Ok(link) = Link::open(api, &ep) else { continue };
+            let link = match Link::open(api, &ep) {
+                Ok(link) => link,
+                Err(e) => {
+                    if cfg!(debug_assertions) {
+                        eprintln!("[logi:{:04x}:{}] open failed: {e}", ep.pid, ep.iface);
+                    }
+                    continue;
+                }
+            };
             let receiver = RECEIVER_PIDS.contains(&ep.pid) || ep.product.to_ascii_lowercase().contains("receiver");
             if receiver {
                 out.extend((1..=6).filter_map(|i| self.probe(&link, &ep, i, true)));
@@ -61,7 +69,7 @@ impl Logitech {
         out
     }
 
-    fn probe(&mut self, link: &Link, ep: &Endpoint, index: u8, via_receiver: bool) -> Option<Observation> {
+    fn probe(&mut self, link: &dyn Hidpp, ep: &Endpoint, index: u8, via_receiver: bool) -> Option<Observation> {
         let id = format!("logi:{:04x}:{}:{:02x}", ep.pid, ep.iface, index);
         let mut result = battery(link, index);
         if via_receiver && !self.identities.contains_key(&id) {
@@ -138,7 +146,7 @@ fn debug(id: &str, e: &Error) {
     }
 }
 
-fn battery(link: &Link, index: u8) -> Result<Raw, Error> {
+fn battery(link: &dyn Hidpp, index: u8) -> Result<Raw, Error> {
     if let Some(f) = link.feature_index(index, UNIFIED_BATTERY)? {
         let r = link.request(index, f, 0x1, &[])?; // get_status
         return Ok(Raw::Percent { percent: r[0], charging: matches!(r[2], 1 | 2) });
@@ -161,7 +169,7 @@ fn battery(link: &Link, index: u8) -> Result<Raw, Error> {
     Ok(Raw::NoBattery)
 }
 
-fn identify(link: &Link, index: u8, ep: &Endpoint, via_receiver: bool) -> Identity {
+fn identify(link: &dyn Hidpp, index: u8, ep: &Endpoint, via_receiver: bool) -> Identity {
     let mut name = None;
     let mut kind = None;
     if let Ok(Some(f)) = link.feature_index(index, DEVICE_NAME) {
@@ -199,4 +207,144 @@ fn identify(link: &Link, index: u8, ep: &Endpoint, via_receiver: bool) -> Identi
     let name = name.unwrap_or(fallback);
     let kind = kind.unwrap_or_else(|| Kind::from_name(&name));
     Identity { name, kind, pids }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[derive(Clone)]
+    enum Reply {
+        Ok(Vec<u8>),
+        Timeout,
+        Protocol(u8),
+    }
+
+    /// Scripted device: feature table (id -> index) plus canned replies per (index, function).
+    struct Fake {
+        features: HashMap<u16, u8>,
+        replies: HashMap<(u8, u8), Reply>,
+    }
+
+    impl Fake {
+        fn new(features: &[(u16, u8)]) -> Self {
+            Self { features: features.iter().copied().collect(), replies: HashMap::new() }
+        }
+        fn reply(mut self, feature_idx: u8, function: u8, r: Reply) -> Self {
+            self.replies.insert((feature_idx, function), r);
+            self
+        }
+    }
+
+    impl Hidpp for Fake {
+        fn request(&self, _index: u8, feature_idx: u8, function: u8, params: &[u8]) -> Result<[u8; 16], Error> {
+            let pad = |v: &[u8]| {
+                let mut out = [0u8; 16];
+                out[..v.len()].copy_from_slice(v);
+                out
+            };
+            if feature_idx == 0 {
+                let id = u16::from_be_bytes([params[0], params[1]]);
+                return Ok(pad(&[self.features.get(&id).copied().unwrap_or(0)]));
+            }
+            match self.replies.get(&(feature_idx, function)).cloned().unwrap_or(Reply::Timeout) {
+                Reply::Ok(v) => Ok(pad(&v)),
+                Reply::Timeout => Err(Error::Timeout),
+                Reply::Protocol(c) => Err(Error::Protocol(c)),
+            }
+        }
+    }
+
+    fn raw(r: Result<Raw, Error>) -> Raw {
+        r.unwrap_or_else(|e| panic!("unexpected error: {e}"))
+    }
+
+    // G733-style headset: only 0x1F20 (ADC measurement), at feature index 8 like HeadsetControl uses.
+    fn g733(adc: Reply) -> Fake {
+        Fake::new(&[(ADC_MEASUREMENT, 8)]).reply(8, 0, adc)
+    }
+
+    fn logi() -> Logitech {
+        Logitech { curves: curve::Curves::load(), identities: HashMap::new() }
+    }
+
+    fn endpoint(pid: u16, product: &str) -> Endpoint {
+        Endpoint { pid, iface: 3, product: product.into(), short: None, long: std::ffi::CString::new("x").unwrap() }
+    }
+
+    #[test]
+    fn adc_headset_reports_millivolts() {
+        // 4000 mV = 0x0FA0, flags: linked.
+        let Raw::Millivolts { mv, charging } = raw(battery(&g733(Reply::Ok(vec![0x0F, 0xA0, 0x01])), 0xFF)) else {
+            panic!("not millivolts")
+        };
+        assert_eq!((mv, charging), (4000, false));
+    }
+
+    #[test]
+    fn adc_headset_charging_flag() {
+        let Raw::Millivolts { charging, .. } = raw(battery(&g733(Reply::Ok(vec![0x10, 0x68, 0x03])), 0xFF)) else {
+            panic!("not millivolts")
+        };
+        assert!(charging);
+    }
+
+    #[test]
+    fn adc_headset_not_linked_is_off() {
+        assert!(matches!(raw(battery(&g733(Reply::Ok(vec![0x0F, 0xA0, 0x00])), 0xFF)), Raw::Off));
+    }
+
+    #[test]
+    fn unified_battery_wins_over_other_features() {
+        let dev = Fake::new(&[(UNIFIED_BATTERY, 5), (BATTERY_VOLTAGE, 6)]).reply(5, 1, Reply::Ok(vec![72, 0, 1]));
+        assert!(matches!(raw(battery(&dev, 1)), Raw::Percent { percent: 72, charging: true }));
+    }
+
+    #[test]
+    fn battery_status_percent() {
+        let dev = Fake::new(&[(BATTERY_STATUS, 4)]).reply(4, 0, Reply::Ok(vec![55, 0, 0]));
+        assert!(matches!(raw(battery(&dev, 1)), Raw::Percent { percent: 55, charging: false }));
+    }
+
+    #[test]
+    fn battery_voltage_charging_bit() {
+        let dev = Fake::new(&[(BATTERY_VOLTAGE, 3)]).reply(3, 0, Reply::Ok(vec![0x0E, 0x10, 0x80]));
+        assert!(matches!(raw(battery(&dev, 1)), Raw::Millivolts { mv: 3600, charging: true }));
+    }
+
+    #[test]
+    fn device_without_battery_feature() {
+        assert!(matches!(raw(battery(&Fake::new(&[]), 1)), Raw::NoBattery));
+    }
+
+    #[test]
+    fn silent_device_times_out() {
+        assert!(matches!(battery(&g733(Reply::Timeout), 0xFF), Err(Error::Timeout)));
+    }
+
+    #[test]
+    fn direct_headset_is_observed_with_name_and_percent() {
+        let dev = g733(Reply::Ok(vec![0x0F, 0xA0, 0x01]));
+        let o = logi().probe(&dev, &endpoint(0x0AB5, "G733 Gaming Headset"), 0xFF, false).expect("observed");
+        assert_eq!(o.name.as_deref(), Some("G733 Gaming Headset"));
+        assert!(matches!(o.state, State::Battery { charging: false, .. }));
+    }
+
+    #[test]
+    fn silent_headset_named_headset_shows_as_off() {
+        let o = logi().probe(&g733(Reply::Timeout), &endpoint(0x0AB5, "G733 Gaming Headset"), 0xFF, false).expect("observed");
+        assert!(matches!(o.state, State::Off));
+    }
+
+    #[test]
+    fn silent_direct_device_without_wireless_name_is_ignored() {
+        assert!(logi().probe(&g733(Reply::Timeout), &endpoint(0x0B1F, "USB Dongle"), 0xFF, false).is_none());
+    }
+
+    #[test]
+    fn empty_receiver_slot_is_skipped() {
+        let dev = Fake::new(&[(UNIFIED_BATTERY, 5)]).reply(5, 1, Reply::Protocol(ERR_UNKNOWN_DEVICE));
+        assert!(logi().probe(&dev, &endpoint(0xC52B, "USB Receiver"), 2, true).is_none());
+    }
 }

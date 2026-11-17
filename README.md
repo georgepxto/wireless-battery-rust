@@ -170,6 +170,7 @@ Only one instance runs at a time: exit the running widget before starting `--dem
 | Bluetooth and HeadsetControl | read every 3 min (reading wakes the device's radio, and HeadsetControl starts a process) |
 | Device plugged in or out, PC resumed from sleep | read immediately |
 | Game or app in full screen | **no reads at all**; one check every 10 s to see if it ended, then everything is read at once |
+| Memory | the working set is handed back to Windows after each read; the app is idle in between |
 | Network | none |
 
 Each HID read is a few packets of 20 to 64 bytes and takes a few milliseconds. Between reads the
@@ -258,8 +259,9 @@ Actions tab with a version.
 ## Credits
 
 - **[taskbar-battery](https://github.com/renanleonel/windows-taskbar-battery)** by Renan Leonel
-  (MIT): the taskbar widget, rendering, notifications, settings, the Logitech HID++, Bluetooth,
-  Xbox, PlayStation and HeadsetControl readers come from this project, with adaptations.
+  (MIT): the taskbar widget, rendering, notifications, settings, the Logitech HID++ (with its
+  tests), Bluetooth (SetupAPI-only), Xbox, PlayStation and HeadsetControl readers and the
+  working-set trimming come from this project, with adaptations.
 - **[mchose-hub-native](https://github.com/jmjp/mchose-hub-native)** by João (jmjp) (MIT): the
   reverse-engineered MCHOSE V9 Pro battery protocol.
 - **[sanshoku](https://github.com/ushineko/sanshoku/issues/36)** (MIT) and
