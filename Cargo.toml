@@ -1,0 +1,49 @@
+[package]
+name = "wireless-battery"
+version = "0.2.0"
+edition = "2021"
+description = "Bateria dos dispositivos sem fio na bandeja do Windows"
+
+[dependencies]
+# Backend HID nativo em Rust: dispensa compilador C. Fixado em 2.6.4 porque a 2.6.5+
+# usa windows-sys 0.61, que exige dlltool (ausente no toolchain GNU do rustup).
+hidapi = { version = "=2.6.4", default-features = false, features = ["windows-native"] }
+
+# APIs WinRT: Bluetooth LE (GATT) e controles (Windows.Gaming.Input).
+[dependencies.windows]
+version = "0.58"
+features = [
+    "Devices_Bluetooth",
+    "Devices_Bluetooth_GenericAttributeProfile",
+    "Devices_Enumeration",
+    "Devices_Power",
+    "Foundation",
+    "Foundation_Collections",
+    "Gaming_Input",
+    "Storage_Streams",
+    "System_Power",
+    "Win32_System_Com",
+]
+
+[dependencies.windows-sys]
+version = "0.59"
+features = [
+    "Win32_Foundation",
+    "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_Devices_Properties",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_System_Console",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
