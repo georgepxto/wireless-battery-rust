@@ -5,6 +5,7 @@
 //!   wireless-battery.exe           widget na barra de tarefas
 //!   wireless-battery.exe --demo    widget com leituras de exemplo (todos os estados)
 //!   wireless-battery.exe --once    imprime os dispositivos encontrados e sai
+//!                                  (com --verbose, tambem as respostas brutas)
 //!   wireless-battery.exe --hid     lista todas as interfaces HID (diagnostico)
 
 mod aula;
@@ -16,6 +17,8 @@ mod logitech;
 mod mchose;
 mod notify;
 mod playstation;
+#[cfg(feature = "probe")]
+mod probe;
 mod render;
 mod scan;
 mod settings;
@@ -25,7 +28,15 @@ mod widget;
 mod xbox;
 
 use std::time::Duration;
-use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
+use std::sync::atomic::{AtomicBool, Ordering};
+use windows_sys::Win32::System::Console::{AttachConsole, GetStdHandle, ATTACH_PARENT_PROCESS, STD_OUTPUT_HANDLE};
+
+/// `--once --verbose`: os leitores imprimem as respostas brutas dos dispositivos.
+static VERBOSE: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn verbose() -> bool {
+    VERBOSE.load(Ordering::Relaxed)
+}
 
 pub(crate) fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
@@ -42,6 +53,7 @@ fn main() {
     match std::env::args().nth(1).as_deref() {
         Some("--once") => {
             attach_console();
+            VERBOSE.store(std::env::args().any(|a| a == "--verbose"), Ordering::Relaxed);
             init_com();
             let mut scanner = scan::Scanner::new();
             let _ = scanner.scan(true);
@@ -69,6 +81,11 @@ fn main() {
                 Err(e) => println!("hidapi: {e}"),
             }
         }
+        #[cfg(feature = "probe")]
+        Some("--probe-mchose") => {
+            attach_console();
+            probe::run();
+        }
         #[cfg(feature = "snapshot")]
         Some("--snapshot") => {
             attach_console();
@@ -84,7 +101,13 @@ fn main() {
 }
 
 /// O release nao tem console proprio: escreve no PowerShell/cmd de onde foi chamado.
+/// Se a saida ja foi redirecionada (`> arquivo`), mantem o redirecionamento.
 fn attach_console() {
-    unsafe { AttachConsole(ATTACH_PARENT_PROCESS) };
+    unsafe {
+        let out = GetStdHandle(STD_OUTPUT_HANDLE);
+        if out.is_null() || out as isize == -1 {
+            AttachConsole(ATTACH_PARENT_PROCESS);
+        }
+    }
     println!();
 }

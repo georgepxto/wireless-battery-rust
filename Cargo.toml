@@ -1,6 +1,6 @@
 [package]
 name = "wireless-battery"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 description = "Bateria dos dispositivos sem fio na barra de tarefas do Windows"
 
@@ -48,6 +48,8 @@ features = [
 [features]
 # Gera as imagens do README: cargo run --release --features snapshot -- --snapshot docs
 snapshot = []
+# Diagnostico do protocolo do MCHOSE: cargo run --release --features probe -- --probe-mchose
+probe = []
 
 [profile.release]
 opt-level = "z"

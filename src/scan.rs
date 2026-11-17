@@ -8,6 +8,8 @@ const SLOW_EVERY: u32 = 3;
 
 const LOGITECH_VID: u16 = 0x046D;
 const MCHOSE_VID: u16 = 0x291D;
+/// MCHOSE V9 Pro pelo cabo USB (chip C-Media).
+const MCHOSE_WIRED: (u16, u16) = (0x0D8C, 0x0343);
 
 pub struct Scanner {
     api: Option<hidapi::HidApi>,
@@ -43,7 +45,7 @@ impl Scanner {
             if let Some(exe) = headsetcontrol::find() {
                 // Nao lista de novo o que ja tem leitor proprio.
                 let skip = |vid: u16, pid: u16| {
-                    vid == MCHOSE_VID || (vid == LOGITECH_VID && obs.iter().any(|o| o.id.starts_with(&format!("logi:{pid:04x}:"))))
+                    vid == MCHOSE_VID || (vid, pid) == MCHOSE_WIRED || (vid == LOGITECH_VID && obs.iter().any(|o| o.id.starts_with(&format!("logi:{pid:04x}:"))))
                 };
                 self.slow.extend(headsetcontrol::scan(&exe, skip));
             }

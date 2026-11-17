@@ -38,8 +38,8 @@ pub fn scan(api: &HidApi) -> Vec<Observation> {
         // Receptor plugado, teclado desligado ou dormindo.
         _ => State::Unreachable,
     };
-    if cfg!(debug_assertions) {
-        eprintln!("[aula] {state:?}");
+    if cfg!(debug_assertions) || crate::verbose() {
+        println!("[aula] {state:?}");
     }
     vec![Observation {
         id: "aula:fa09".to_string(),
@@ -67,6 +67,9 @@ fn query(dev: &HidDevice) -> Option<(u8, u8)> {
     let mut rx = [0u8; 64];
     while Instant::now() < deadline {
         let n = dev.read_timeout(&mut rx, 20).ok()?;
+        if n > 0 && crate::verbose() {
+            println!("[aula] resposta: {:02X?}", &rx[..n]);
+        }
         if let Some(r) = parse(&rx[..n]) {
             return Some(r);
         }

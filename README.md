@@ -72,7 +72,7 @@ from the taskbar and listed as "desconectado" in the menu.
 |---|---|---|
 | **Logitech** mice and keyboards (e.g. PRO X Superlight 2) | Lightspeed, Unifying or Bolt receiver | Logitech HID++ protocol, features `0x1004`, `0x1000`, `0x1001`, `0x1F20` |
 | **Logitech** headsets with their own dongle | USB dongle | HID++ over the dongle |
-| **MCHOSE V9 Pro** headset | 2.4 GHz dongle or USB cable (`291D:385D`) | MCHOSE vendor protocol (`0x65` battery request) |
+| **MCHOSE V9 Pro** headset | 2.4 GHz dongle (`291D:385D`) or USB cable (`0D8C:0343`) | MCHOSE vendor protocol (`0x65` battery request) |
 | **AULA F75** keyboard | 2.4 GHz receiver (`3554:FA09`) | AULA receiver protocol (`0x13 0x4A` battery request) |
 | **Bluetooth headphones and earbuds** (AirPods, Galaxy Buds, Sony, JBL...) | Classic Bluetooth | The level the device reports to Windows, the same value shown in Settings > Bluetooth |
 | **Bluetooth LE** mice, keyboards and controllers (including AULA F75 in BT mode) | Bluetooth LE | Standard GATT Battery Service (`0x180F` / `0x2A19`) |
@@ -89,7 +89,8 @@ from the taskbar and listed as "desconectado" in the menu.
 | Logitech G Pro Wireless (mouse) | Lightspeed receiver | Working (tested in [taskbar-battery](https://github.com/renanleonel/windows-taskbar-battery)) |
 | Logitech PRO X Wireless (headset) | USB dongle | Working (tested in [taskbar-battery](https://github.com/renanleonel/windows-taskbar-battery)) |
 | Apple AirPods | Classic Bluetooth | Working (tested in [taskbar-battery](https://github.com/renanleonel/windows-taskbar-battery)) |
-| MCHOSE V9 Pro | 2.4 GHz dongle | Implemented from the [mchose-hub-native](https://github.com/jmjp/mchose-hub-native) protocol, not yet confirmed here |
+| MCHOSE V9 Pro | USB cable | Working, including the charging state |
+| MCHOSE V9 Pro | 2.4 GHz dongle | Same protocol, not yet confirmed while the headset is on battery |
 | Bluetooth LE devices, Xbox and PlayStation controllers, HeadsetControl headsets | all | Implemented, not yet tested on hardware |
 | Machenike G5 Pro | 2.4 GHz dongle / USB cable | **Not supported**, see [Limitations](#limitations) |
 
@@ -141,6 +142,7 @@ Hover the widget to see each device's full name and status.
 wireless-battery.exe           # taskbar widget
 wireless-battery.exe --demo    # widget with sample readings covering every state
 wireless-battery.exe --once    # print the devices found and exit
+wireless-battery.exe --once --verbose   # same, plus the raw replies of the MCHOSE and AULA readers
 wireless-battery.exe --hid     # list every HID interface (VID:PID, usage page), for diagnostics
 ```
 
@@ -197,7 +199,8 @@ thread is idle.
 - **AULA**: only the F75 receiver (`3554:FA09`) is recognized. On the USB cable the keyboard reports
   "charging" without a percentage.
 - **MCHOSE**: only the V9 Pro protocol is known. Other MCHOSE headsets with the same interface may
-  work, but are untested.
+  work, but are untested. While the USB cable is plugged in, the headset stops talking through the
+  2.4 GHz dongle; the app reads it through the cable instead, as a single device.
 - **Sleeping vs. off**: for Logitech and AULA receivers, a device that is switched off looks the
   same as one that is asleep, so it keeps its last level until the receiver is unplugged.
 - **Charging state** is not available for Bluetooth devices.
@@ -236,6 +239,15 @@ cargo run --release --features snapshot -- --snapshot docs\raw
 
 This renders every state to transparent PNGs at 2x scale with the same code as the widget. The
 `snapshot` feature is not part of release builds.
+
+### Probing the MCHOSE protocol
+
+```powershell
+cargo run --release --features probe -- --probe-mchose
+```
+
+Tries every known battery request on the dongle and on the USB cable, and prints every reply from
+every HID collection. Also not part of release builds.
 
 ### Releases
 
