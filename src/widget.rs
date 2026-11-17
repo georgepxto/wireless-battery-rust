@@ -134,7 +134,7 @@ unsafe fn register(hinst: HINSTANCE, class: &[u16], proc_: unsafe extern "system
     RegisterClassW(&wc);
 }
 
-fn demo_readings() -> Vec<Reading> {
+pub(crate) fn demo_readings() -> Vec<Reading> {
     let r = |id: &str, name: &str, kind, status| Reading { id: id.into(), name: name.into(), kind, status };
     vec![
         r("demo:headset", "MCHOSE V9 Pro", Kind::Headset, Status::Battery { percent: 64, charging: true }),

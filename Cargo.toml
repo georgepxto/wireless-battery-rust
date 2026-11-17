@@ -45,6 +45,10 @@ features = [
     "Win32_UI_WindowsAndMessaging",
 ]
 
+[features]
+# Gera as imagens do README: cargo run --release --features snapshot -- --snapshot docs
+snapshot = []
+
 [profile.release]
 opt-level = "z"
 lto = true

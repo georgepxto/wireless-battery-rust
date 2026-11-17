@@ -42,6 +42,17 @@ struct Seg {
 
 /// Renders the widget and returns its width in physical pixels.
 pub unsafe fn draw(hwnd: HWND, items: &[(Kind, Status)], dpi: u32, height: i32, light: bool) -> i32 {
+    render(items, dpi, height, light, |dc, width, _| {
+        let size = SIZE { cx: width, cy: height };
+        let origin = POINT { x: 0, y: 0 };
+        let blend = BLENDFUNCTION { BlendOp: AC_SRC_OVER as u8, BlendFlags: 0, SourceConstantAlpha: 255, AlphaFormat: AC_SRC_ALPHA as u8 };
+        UpdateLayeredWindow(hwnd, null_mut(), null(), &size, dc, &origin, 0, &blend, ULW_ALPHA);
+    })
+}
+
+/// Desenha o widget e entrega o DC, a largura e os pixels BGRA pre-multiplicados ao `sink`.
+/// Usado pelo widget (UpdateLayeredWindow) e pelo `--snapshot` (PNG para o README).
+pub unsafe fn render(items: &[(Kind, Status)], dpi: u32, height: i32, light: bool, sink: impl FnOnce(HDC, i32, &[u32])) -> i32 {
     let s = |v: i32| v * dpi as i32 / 96;
     let fg = if light { 0x000000 } else { 0xFFFFFF };
     let red = if light { 0xC42B1C } else { 0xFF6B6B };
@@ -174,10 +185,7 @@ pub unsafe fn draw(hwnd: HWND, items: &[(Kind, Status)], dpi: u32, height: i32, 
         };
     }
 
-    let size = SIZE { cx: width, cy: height };
-    let origin = POINT { x: 0, y: 0 };
-    let blend = BLENDFUNCTION { BlendOp: AC_SRC_OVER as u8, BlendFlags: 0, SourceConstantAlpha: 255, AlphaFormat: AC_SRC_ALPHA as u8 };
-    UpdateLayeredWindow(hwnd, null_mut(), null(), &size, dc, &origin, 0, &blend, ULW_ALPHA);
+    sink(dc, width, px);
 
     SelectObject(dc, old_bmp);
     DeleteObject(bmp);

@@ -19,6 +19,8 @@ mod playstation;
 mod render;
 mod scan;
 mod settings;
+#[cfg(feature = "snapshot")]
+mod snapshot;
 mod widget;
 mod xbox;
 
@@ -66,6 +68,12 @@ fn main() {
                 }
                 Err(e) => println!("hidapi: {e}"),
             }
+        }
+        #[cfg(feature = "snapshot")]
+        Some("--snapshot") => {
+            attach_console();
+            let dir = std::env::args().nth(2).unwrap_or_else(|| "docs".into());
+            snapshot::run(std::path::Path::new(&dir));
         }
         Some("--demo") => {
             widget::DEMO.store(true, std::sync::atomic::Ordering::Relaxed);
