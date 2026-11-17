@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Versão da release (ex.: v0.3.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Toolchain GNU: usa o manifesto pré-compilado em res/resources.o (ver build.rs).
+      - name: Instalar Rust (GNU)
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
+          rustup override set stable-x86_64-pc-windows-gnu
+
+      - name: Compilar
+        run: cargo build --release --locked
+
+      - name: Preparar artefato
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/release/wireless-battery.exe dist/
+          $hash = (Get-FileHash dist/wireless-battery.exe -Algorithm SHA256).Hash.ToLower()
+          "SHA-256: ``$hash``" | Out-File -Encoding utf8 dist/sha256.md
+
+      - name: Publicar release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          body_path: dist/sha256.md
+          files: dist/wireless-battery.exe
