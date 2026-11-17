@@ -1,6 +1,6 @@
 [package]
 name = "wireless-battery"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "Bateria dos dispositivos sem fio na barra de tarefas do Windows"
 
