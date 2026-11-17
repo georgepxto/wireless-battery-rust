@@ -10,9 +10,12 @@
 mod aula;
 mod bluetooth;
 mod device;
+mod headsetcontrol;
+mod json;
 mod logitech;
 mod mchose;
 mod notify;
+mod playstation;
 mod render;
 mod scan;
 mod settings;

@@ -4,7 +4,8 @@
 https://github.com/renanleonel/windows-taskbar-battery
 
 `src/logitech/` (HID++), `src/bluetooth.rs`, `src/xbox.rs`, `src/device.rs`, `src/widget.rs`,
-`src/render.rs`, `src/notify.rs`, `src/settings.rs` e o manifesto em `res/` vêm desse projeto,
+`src/render.rs`, `src/notify.rs`, `src/settings.rs`, `src/playstation.rs`, `src/headsetcontrol.rs`
+e o manifesto em `res/` vêm desse projeto,
 com adaptações (textos em português, modo "somente um", estado "carregando sem porcentagem",
 fonte de ícones do Windows 10).
 

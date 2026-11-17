@@ -10,7 +10,7 @@ para cada tipo: headset, fones (AirPods, Galaxy Buds...), mouse, teclado e contr
 - Passe o mouse para ver o nome completo e o estado de cada um.
 - Aviso do Windows quando um dispositivo chega a 20%, uma vez por descarga.
 - Segue o tema claro/escuro e a escala (DPI) da barra; volta sozinho se o Explorer reiniciar.
-- Leitura numa thread separada: HID e controles a cada 60 s, Bluetooth a cada 3 min,
+- Leitura numa thread separada: HID e controles a cada 60 s, Bluetooth e HeadsetControl a cada 3 min,
   e na hora quando algo é plugado/removido ou o PC volta da suspensão.
 - **Pausa durante jogos:** com um jogo ou outro app em tela cheia, nenhuma leitura é feita.
   Ao sair, lê tudo na hora.
@@ -25,6 +25,20 @@ para cada tipo: headset, fones (AirPods, Galaxy Buds...), mouse, teclado e contr
 | AULA F75, mouses, teclados BLE | Bluetooth LE | GATT Battery Service |
 | AirPods, fones, headsets | Bluetooth clássico | propriedade PnP que o Windows usa em Configurações |
 | Controles Xbox e compatíveis | Bluetooth / adaptador Xbox | Windows.Gaming.Input |
+| DualSense, DualSense Edge, DualShock 4 | USB / Bluetooth | relatório de entrada do controle |
+| SteelSeries, HyperX, Corsair, Audeze e outros headsets | dongle USB | [HeadsetControl](#outros-headsets-headsetcontrol) (opcional) |
+
+### Outros headsets (HeadsetControl)
+
+O [HeadsetControl](https://github.com/Sapd/HeadsetControl) lê dezenas de headsets com dongle
+próprio. Para usar, baixe o `headsetcontrol-windows-x86_64.exe` na
+[página de releases](https://github.com/Sapd/HeadsetControl/releases/latest) e coloque **na
+mesma pasta do `wireless-battery.exe`** (ou em qualquer pasta do `PATH`), depois reinicie o app.
+Ele roda escondido a cada 3 minutos; headsets que o app já lê sozinho (Logitech, MCHOSE) não
+aparecem duas vezes. Não é distribuído junto, e a licença GPL dele não se aplica a este projeto.
+
+Controles PlayStation por Bluetooth só enviam a bateria depois que um jogo ou a Steam
+usaram o controle uma vez.
 
 ## Compilar
 
