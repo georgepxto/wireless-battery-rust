@@ -56,8 +56,7 @@ pub struct Observation {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Status {
-    /// `stale`: last known reading of a device that's asleep right now.
-    Battery { percent: u8, charging: bool, stale: bool },
+    Battery { percent: u8, charging: bool },
     /// No cabo, mas o aparelho nao informa a porcentagem (ex.: AULA F75).
     ChargingNoLevel,
     NotConnected,
@@ -66,13 +65,10 @@ pub enum Status {
 impl std::fmt::Display for Status {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Status::Battery { percent, charging, stale } => {
+            Status::Battery { percent, charging } => {
                 write!(f, "{percent}%")?;
                 if *charging {
                     write!(f, " (carregando)")?;
-                }
-                if *stale {
-                    write!(f, " (dormindo)")?;
                 }
                 Ok(())
             }
@@ -104,12 +100,11 @@ impl Tracker {
             seen.insert(o.id.clone());
             let pos = self.known.iter().position(|r| r.id == o.id);
             let status = match (o.state, pos.map(|p| self.known[p].status)) {
-                (State::Battery { percent, charging }, _) => Status::Battery { percent, charging, stale: false },
+                (State::Battery { percent, charging }, _) => Status::Battery { percent, charging },
                 (State::ChargingNoLevel, _) => Status::ChargingNoLevel,
-                // Asleep: battery hasn't changed, keep the last reading but mark it.
-                (State::Unreachable, Some(Status::Battery { percent, charging, .. })) => {
-                    Status::Battery { percent, charging, stale: true }
-                }
+                // Sem resposta (dormindo, em geral): a bateria nao muda nesse meio tempo,
+                // entao mantem a ultima leitura como esta.
+                (State::Unreachable, Some(prev @ (Status::Battery { .. } | Status::ChargingNoLevel))) => prev,
                 (State::Unreachable | State::Off, _) => Status::NotConnected,
             };
             match pos {
@@ -158,11 +153,11 @@ mod tests {
     }
 
     #[test]
-    fn sleeping_device_keeps_last_reading_dimmed() {
+    fn sleeping_device_keeps_last_reading() {
         let mut t = Tracker::default();
         t.update(vec![obs(State::Battery { percent: 80, charging: false })]);
         let r = t.update(vec![obs(State::Unreachable)]);
-        assert_eq!(r[0].status, Status::Battery { percent: 80, charging: false, stale: true });
+        assert_eq!(r[0].status, Status::Battery { percent: 80, charging: false });
     }
 
     #[test]

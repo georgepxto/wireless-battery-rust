@@ -21,6 +21,9 @@ use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::System::Threading::CreateMutexW;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::HiDpi::*;
+use windows_sys::Win32::UI::Shell::{
+    SHQueryUserNotificationState, QUNS_BUSY, QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 const WM_APP_UPDATE: u32 = WM_APP + 1;
@@ -39,8 +42,11 @@ const CMD_TOGGLE_BASE: usize = 100;
 /// "Somente este dispositivo".
 const CMD_ONLY_BASE: usize = 200;
 
-/// HID e controles: a cada 20 s. O Bluetooth e lido a cada 3 ciclos (ver scan.rs).
-const POLL: Duration = Duration::from_secs(20);
+/// HID e controles: a cada 60 s. O Bluetooth e lido a cada 3 ciclos (ver scan.rs).
+/// A bateria muda devagar; plugar/remover algo ou voltar da suspensao forca uma leitura.
+const POLL: Duration = Duration::from_secs(60);
+/// Com jogo ou outro app em tela cheia nao ha leitura nenhuma; confere a cada 10 s se saiu.
+const PAUSED_CHECK: Duration = Duration::from_secs(10);
 
 static READINGS: Mutex<Option<Vec<Reading>>> = Mutex::new(None);
 static WAKE: OnceLock<Sender<()>> = OnceLock::new();
@@ -131,10 +137,10 @@ unsafe fn register(hinst: HINSTANCE, class: &[u16], proc_: unsafe extern "system
 fn demo_readings() -> Vec<Reading> {
     let r = |id: &str, name: &str, kind, status| Reading { id: id.into(), name: name.into(), kind, status };
     vec![
-        r("demo:headset", "MCHOSE V9 Pro", Kind::Headset, Status::Battery { percent: 64, charging: true, stale: false }),
-        r("demo:earbuds", "AirPods Pro", Kind::Earbuds, Status::Battery { percent: 12, charging: false, stale: false }),
-        r("demo:mouse", "PRO X SUPERLIGHT 2", Kind::Mouse, Status::Battery { percent: 87, charging: false, stale: true }),
-        r("demo:keyboard", "AULA F75", Kind::Keyboard, Status::Battery { percent: 45, charging: false, stale: false }),
+        r("demo:headset", "MCHOSE V9 Pro", Kind::Headset, Status::Battery { percent: 64, charging: true }),
+        r("demo:earbuds", "AirPods Pro", Kind::Earbuds, Status::Battery { percent: 12, charging: false }),
+        r("demo:mouse", "PRO X SUPERLIGHT 2", Kind::Mouse, Status::Battery { percent: 87, charging: false }),
+        r("demo:keyboard", "AULA F75", Kind::Keyboard, Status::Battery { percent: 45, charging: false }),
         r("demo:gamepad", "Xbox Wireless Controller", Kind::Gamepad, Status::ChargingNoLevel),
     ]
 }
@@ -152,11 +158,23 @@ fn worker(controller: usize, rx: Receiver<()>) {
     // a segunda leitura sai em 3 s para o controle aparecer logo.
     let mut wait = Duration::from_secs(3);
     let mut forced = true;
+    let mut was_paused = false;
     loop {
-        let readings = scanner.scan(forced);
-        alerts.check(&readings);
-        *READINGS.lock().unwrap() = Some(readings);
-        unsafe { PostMessageW(controller as HWND, WM_APP_UPDATE, 0, 0) };
+        let paused = fullscreen_app();
+        if paused {
+            // Nada de HID nem Bluetooth enquanto o jogo roda; a barra fica escondida mesmo.
+            wait = PAUSED_CHECK;
+        } else {
+            // Saiu do jogo: le na hora, incluindo o Bluetooth.
+            let readings = scanner.scan(forced || was_paused);
+            alerts.check(&readings);
+            *READINGS.lock().unwrap() = Some(readings);
+            unsafe { PostMessageW(controller as HWND, WM_APP_UPDATE, 0, 0) };
+            if was_paused {
+                wait = POLL;
+            }
+        }
+        was_paused = paused;
 
         forced = match rx.recv_timeout(wait) {
             Ok(()) => {
@@ -168,8 +186,17 @@ fn worker(controller: usize, rx: Receiver<()>) {
             Err(RecvTimeoutError::Timeout) => false,
             Err(RecvTimeoutError::Disconnected) => return,
         };
-        wait = POLL;
+        if !paused {
+            wait = POLL;
+        }
     }
+}
+
+/// Jogo em tela cheia (exclusiva ou sem bordas), apresentacao ou outro app em tela cheia.
+fn fullscreen_app() -> bool {
+    let mut state = 0;
+    let ok = unsafe { SHQueryUserNotificationState(&mut state) } == 0;
+    ok && matches!(state, QUNS_BUSY | QUNS_RUNNING_D3D_FULL_SCREEN | QUNS_PRESENTATION_MODE)
 }
 
 fn wake() {

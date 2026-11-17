@@ -13,8 +13,6 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{UpdateLayeredWindow, ULW_ALPHA
 
 pub const LOW_BATTERY: u8 = 20;
 const BOLT: &str = "\u{E945}";
-/// Opacity for the last known value of a sleeping device.
-const STALE_OPACITY: u32 = 130;
 /// Newer glyph (clearer at small sizes); older Segoe Fluent Icons versions only have the pair.
 const EARBUD_SINGLE: &str = "\u{F27C}";
 const EARBUD_PAIR: &str = "\u{F4C0}";
@@ -63,9 +61,9 @@ pub unsafe fn draw(hwnd: HWND, items: &[(Kind, Status)], dpi: u32, height: i32, 
     for (i, (kind, status)) in items.iter().enumerate() {
         let gap = if i == items.len() - 1 { 0 } else { s(12) };
         let (label, color, opacity, charging) = match *status {
-            Status::Battery { percent, charging, stale } => {
+            Status::Battery { percent, charging } => {
                 let color = if percent <= LOW_BATTERY && !charging { red } else { fg };
-                (format!("{percent}%"), color, if stale { STALE_OPACITY } else { 255 }, charging)
+                (format!("{percent}%"), color, 255, charging)
             }
             Status::ChargingNoLevel => {
                 segs.push(seg(icon(*kind), true, fg, 255, s(3)));

@@ -3,7 +3,7 @@
 use crate::device::{Observation, Reading, Tracker};
 use crate::{aula, bluetooth, logitech, mchose, xbox};
 
-/// O Bluetooth acorda o radio do aparelho: so e lido a cada N rodadas (N x 20 s).
+/// O Bluetooth acorda o radio do aparelho: so e lido a cada N rodadas (N x 60 s = 3 min).
 const BT_EVERY: u32 = 3;
 
 pub struct Scanner {

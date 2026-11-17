@@ -5,13 +5,15 @@ para cada tipo: headset, fones (AirPods, Galaxy Buds...), mouse, teclado e contr
 
 - **Mostrar na barra** (clique no widget): todos os dispositivos ou somente um.
   No modo "todos", desmarque um dispositivo na lista para escondê-lo.
-- Texto em **vermelho** com 20% ou menos; **⚡ verde** carregando; **esmaecido** quando o
-  dispositivo está dormindo (mostra o último nível conhecido).
+- Texto em **vermelho** com 20% ou menos; **⚡ verde** carregando. Um dispositivo que não
+  responde por estar em repouso continua com o último nível lido.
 - Passe o mouse para ver o nome completo e o estado de cada um.
 - Aviso do Windows quando um dispositivo chega a 20%, uma vez por descarga.
 - Segue o tema claro/escuro e a escala (DPI) da barra; volta sozinho se o Explorer reiniciar.
-- Leitura numa thread separada: HID e controles a cada 20 s, Bluetooth a cada 60 s,
+- Leitura numa thread separada: HID e controles a cada 60 s, Bluetooth a cada 3 min,
   e na hora quando algo é plugado/removido ou o PC volta da suspensão.
+- **Pausa durante jogos:** com um jogo ou outro app em tela cheia, nenhuma leitura é feita.
+  Ao sair, lê tudo na hora.
 
 ## Fontes de bateria
 

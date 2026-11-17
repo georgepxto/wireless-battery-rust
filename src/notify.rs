@@ -22,8 +22,8 @@ pub struct LowBatteryAlerts {
 impl LowBatteryAlerts {
     pub fn check(&mut self, readings: &[Reading]) {
         for r in readings {
-            let (percent, charging, stale) = match r.status {
-                Status::Battery { percent, charging, stale } => (percent, charging, stale),
+            let (percent, charging) = match r.status {
+                Status::Battery { percent, charging } => (percent, charging),
                 Status::ChargingNoLevel => {
                     self.alerted.remove(&r.id);
                     continue;
@@ -32,7 +32,7 @@ impl LowBatteryAlerts {
             };
             if charging || percent > REARM_ABOVE {
                 self.alerted.remove(&r.id);
-            } else if percent <= LOW_BATTERY && !stale && self.alerted.insert(r.id.clone()) && settings::alerts_enabled() {
+            } else if percent <= LOW_BATTERY && self.alerted.insert(r.id.clone()) && settings::alerts_enabled() {
                 let body = format!("{} está com {percent}%. Hora de carregar.", r.name);
                 if let Err(e) = show("Bateria baixa", &body) {
                     if cfg!(debug_assertions) {
