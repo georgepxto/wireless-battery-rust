@@ -17,6 +17,8 @@ use crate::hid::{DeviceInfo, HidApi, HidDevice};
 use std::time::{Duration, Instant};
 
 const DONGLE_VID: u16 = 0x291D;
+/// MCHOSE X9: mesmo protocolo na colecao 0xFF90 (renanleonel, 1b63e53; HeadsetControl).
+pub const X9: (u16, u16) = (0x3837, 0x6045);
 const CMEDIA_VID: u16 = 0x0D8C;
 const USAGE_COMMAND: u16 = 0xFF82;
 const USAGE_NOTIFY: u16 = 0xFF90;
@@ -37,6 +39,19 @@ fn is_mchose(d: &DeviceInfo) -> bool {
 }
 
 pub fn scan(api: &HidApi) -> Vec<Observation> {
+    let mut out = scan_v9(api);
+    if api.device_list().any(|d| (d.vendor_id(), d.product_id()) == X9 && d.usage_page() == USAGE_NOTIFY) {
+        out.push(Observation {
+            id: "mchose:x9".to_string(),
+            name: Some("MCHOSE X9".to_string()),
+            kind: Some(Kind::Headset),
+            state: read(api, X9.0, X9.1, false),
+        });
+    }
+    out
+}
+
+fn scan_v9(api: &HidApi) -> Vec<Observation> {
     let mut ids: Vec<(u16, u16)> = api
         .device_list()
         .filter(|d| is_mchose(d) && d.usage_page() == USAGE_NOTIFY)

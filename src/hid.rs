@@ -63,6 +63,8 @@ pub struct DeviceInfo {
     in_len: u16,
     out_len: u16,
     feat_len: u16,
+    /// Quantos campos de valor ha nos reports de entrada e de feature (HIDP_CAPS).
+    value_caps: (u16, u16),
     product: String,
     manufacturer: String,
     serial: String,
@@ -97,6 +99,11 @@ impl DeviceInfo {
     pub fn feature_len(&self) -> u16 {
         self.feat_len
     }
+    /// Tem algum campo de valor (pre-requisito do campo padrao de bateria)?
+    pub fn has_value_caps(&self) -> bool {
+        self.value_caps != (0, 0)
+    }
+
     pub fn product_string(&self) -> Option<&str> {
         (!self.product.is_empty()).then_some(self.product.as_str())
     }
@@ -252,6 +259,7 @@ unsafe fn describe(path: &str) -> Option<DeviceInfo> {
         in_len: caps.InputReportByteLength,
         out_len: caps.OutputReportByteLength,
         feat_len: caps.FeatureReportByteLength,
+        value_caps: (caps.NumberInputValueCaps, caps.NumberFeatureValueCaps),
         product,
         manufacturer,
         serial,
@@ -467,5 +475,81 @@ impl HidDevice {
     }
     pub fn feature_len(&self) -> usize {
         self.feat_len
+    }
+}
+
+/// Campo padrao de bateria do HID: "Battery Strength" (pagina 0x06, uso 0x20) ou "Absolute State Of
+/// Charge" (0x85, 0x65), num feature report ou num input report pedido pela linha de controle.
+/// Posicao, tamanho e faixa vem do proprio descritor do dispositivo (HidP_GetValueCaps).
+/// Logica de krisgfx9/Wireless-Device-Battery-Monitor (GPL-3.0), generic.cpp; ideia tambem em
+/// renanleonel/windows-taskbar-battery (MIT), hid_battery.rs.
+pub fn battery_strength(info: &DeviceInfo) -> Option<i32> {
+    use windows_sys::Win32::Devices::HumanInterfaceDevice::{
+        HidP_Feature, HidP_GetUsageValue, HidP_GetValueCaps, HidP_Input, HIDP_REPORT_TYPE, HIDP_VALUE_CAPS,
+    };
+    if !info.has_value_caps() {
+        return None;
+    }
+    unsafe {
+        let wpath = wide_path(&info.path);
+        let h = CreateFileW(wpath.as_ptr(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, null(), OPEN_EXISTING, 0, null_mut());
+        if h == INVALID_HANDLE_VALUE {
+            return None;
+        }
+        let mut pp = 0;
+        if HidD_GetPreparsedData(h, &mut pp) == 0 {
+            CloseHandle(h);
+            return None;
+        }
+        let mut pct = None;
+        let kinds: [(HIDP_REPORT_TYPE, u16, u16); 2] =
+            [(HidP_Feature, info.value_caps.1, info.feat_len), (HidP_Input, info.value_caps.0, info.in_len)];
+        'types: for (kind, count, len) in kinds {
+            if count == 0 || len == 0 {
+                continue;
+            }
+            let mut n = count;
+            let mut caps: Vec<HIDP_VALUE_CAPS> = vec![zeroed(); n as usize];
+            if HidP_GetValueCaps(kind, caps.as_mut_ptr(), &mut n, pp) != HIDP_STATUS_SUCCESS {
+                continue;
+            }
+            for v in &caps[..n as usize] {
+                let usage = if v.IsRange != 0 { v.Anonymous.Range.UsageMin } else { v.Anonymous.NotRange.Usage };
+                if !((v.UsagePage == 0x06 && usage == 0x20) || (v.UsagePage == 0x85 && usage == 0x65)) {
+                    continue;
+                }
+                let mut buf = vec![0u8; len as usize];
+                buf[0] = v.ReportID;
+                let got = if kind == HidP_Feature {
+                    HidD_GetFeature(h, buf.as_mut_ptr() as *mut _, len as u32)
+                } else {
+                    HidD_GetInputReport(h, buf.as_mut_ptr() as *mut _, len as u32)
+                };
+                if got == 0 {
+                    continue;
+                }
+                let mut val = 0u32;
+                if HidP_GetUsageValue(kind, v.UsagePage, v.LinkCollection, usage, &mut val, pp, buf.as_mut_ptr() as _, len as u32)
+                    != HIDP_STATUS_SUCCESS
+                {
+                    continue;
+                }
+                // Apple (Magic Mouse / Trackpad / Keyboard) manda porcentagem direta declarando 0-255.
+                let p = if info.vid == 0x05AC && val <= 100 {
+                    val as i32
+                } else if v.LogicalMax > v.LogicalMin {
+                    ((val as i32 - v.LogicalMin) * 100 / (v.LogicalMax - v.LogicalMin)).clamp(0, 100)
+                } else if val <= 100 {
+                    val as i32
+                } else {
+                    continue;
+                };
+                pct = Some(p);
+                break 'types;
+            }
+        }
+        HidD_FreePreparsedData(pp);
+        CloseHandle(h);
+        pct
     }
 }

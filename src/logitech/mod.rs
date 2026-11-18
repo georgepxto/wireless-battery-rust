@@ -115,6 +115,11 @@ impl Logitech {
             }
         };
 
+        if via_receiver && matches!(raw, Raw::Off) && !self.identities.contains_key(&id) {
+            // "Desligado" vem de dongles de headset; atras de um receptor e leitura truncada, e
+            // sem identidade o aparelho apareceria com o nome do receptor.
+            return None;
+        }
         if !self.identities.contains_key(&id) && !matches!(raw, Raw::Off) {
             let identity = identify(link, index, ep, via_receiver);
             self.identities.insert(id.clone(), identity);
@@ -340,6 +345,12 @@ mod tests {
     #[test]
     fn silent_direct_device_without_wireless_name_is_ignored() {
         assert!(logi().probe(&g733(Reply::Timeout), &endpoint(0x0B1F, "USB Dongle"), 0xFF, false).is_none());
+    }
+
+    #[test]
+    fn unidentified_receiver_device_reading_off_is_skipped() {
+        let dev = Fake::new(&[(ADC_MEASUREMENT, 8)]).reply(8, 0, Reply::Ok(vec![0x0F, 0xA0, 0x00]));
+        assert!(logi().probe(&dev, &endpoint(0xC539, "USB Receiver"), 1, true).is_none());
     }
 
     #[test]

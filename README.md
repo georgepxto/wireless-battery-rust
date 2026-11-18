@@ -31,8 +31,8 @@ taskbar widget.</sub>
 - **Taskbar widget** next to the notification area, with an icon and a percentage per device.
 - **Show all devices or only one**, and hide individual devices.
 - **Low-battery notification** when a device drops to 20%, once per discharge.
-- **Follows Windows**: light/dark taskbar theme, DPI scaling, and comes back by itself if
-  Explorer restarts.
+- **Follows Windows**: light/dark taskbar theme, DPI scaling, a taskbar docked to the left or
+  right (devices stacked in a column), and comes back by itself if Explorer restarts.
 - **Pauses while you play**: no device is queried while a game or any other app is full screen.
 - **Lightweight**: a single executable of about 500 KB, written in Rust with plain Win32 for the
   UI. No telemetry; the network is only used when you check for updates.
@@ -93,10 +93,15 @@ project, but not yet with this app. Reports are welcome.
   Glorious (Model O/D/I 2 and others), Lamzu, Endgame Gear, VAXEE, WLmouse, Ninjutso Sora V2,
   Sprime PM1, MCHOSE mice, Dareu, Rapoo VT series, Redragon (Compx and Areson receivers),
   Fantech Helios Go XD5, Motospeed X6, Delux M800 / M900, Attack Shark, Ajazz, Incott, Wraith W1,
-  RK MG6 Pro, ZOWIE EC-CW / DW / U2, ASUS ROG, Razer.
+  RK MG6 Pro, ZOWIE EC-CW / DW / U2, ASUS ROG, Razer, SteelSeries (Aerox, Prime, Rival 3 / 650 / Pro),
+  Corsair Slipstream, Cooler Master MM712 / MM731.
+- **Anything else on USB** that reports its battery the standard HID way (a "Battery Strength" or
+  "Absolute State Of Charge" field), read straight from the device's report descriptor.
 - **Keyboards**: AULA (more receivers), Keychron (classic, 8K, 4K, Nape), Rongyuan-based boards,
   SONiX-based boards, Razer.
-- **Headsets**: HyperX (Cloud III, III S, II, II Core, Alpha, Alpha 2, Flight, Stinger Core),
+- **Headsets**: Corsair (VOID family, VOID WIRELESS V2, VIRTUOSO, HS80 MAX), SteelSeries (Arctis 1,
+  7, 9, Pro Wireless, 7+, Nova 3P / 5 / 7 / Pro Wireless, GameBuds), MCHOSE X9,
+  HyperX (Cloud III, III S, II, II Core, Alpha, Alpha 2, Flight, Stinger Core),
   Logitech G435 (`046D:0ADF` dongle), Sony INZONE (H9 II, H5, Buds), Jabra, JBL Quantum, Fractal
   Scape, ASUS ROG.
 
@@ -287,8 +292,9 @@ Actions tab with a version.
 
 - **[taskbar-battery](https://github.com/renanleonel/windows-taskbar-battery)** by Renan Leonel
   (MIT): the taskbar widget, rendering, notifications, settings, the Logitech HID++ (with its
-  tests), Bluetooth (SetupAPI-only), Xbox, PlayStation and HeadsetControl readers and the
-  working-set trimming come from this project, with adaptations.
+  tests and the fix for late replies), Bluetooth (SetupAPI-only), Xbox, PlayStation and
+  HeadsetControl readers, the vertical-taskbar layout, the MCHOSE X9 ids, the Corsair Wireless V2
+  wake-up sequence and the working-set trimming come from this project, with adaptations.
 - **[mchose-hub-native](https://github.com/jmjp/mchose-hub-native)** by João (jmjp) (MIT): the
   reverse-engineered MCHOSE V9 Pro battery protocol.
 - **[sanshoku](https://github.com/ushineko/sanshoku/issues/36)** (MIT) and

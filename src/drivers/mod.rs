@@ -45,6 +45,10 @@ const ORDER: &[(&str, Poll)] = &[
     ("hyperx", hyperx::poll),
     ("logitech_g435", logitech_g435::poll),
     ("razer", razer::poll),
+    ("steelseries", steelseries::poll),
+    ("corsair", corsair::poll),
+    ("coolermaster", coolermaster::poll),
+    ("generic", generic::poll),
 ];
 
 /// Roda todos os leitores; `claimed` sao os (VID, PID) que os leitores proprios ja trataram.
@@ -66,11 +70,14 @@ pub fn poll_all(api: &HidApi, claimed: &[(u16, u16)]) -> Vec<Observation> {
 
 pub mod areson;
 pub mod atk;
+pub mod coolermaster;
+pub mod corsair;
 pub mod aula;
 pub mod dareu;
 pub mod endgame;
 pub mod fantech;
 pub mod fractal;
+pub mod generic;
 pub mod glorious;
 pub mod hyperx;
 pub mod inzone;
@@ -90,6 +97,7 @@ pub mod rk;
 pub mod rog;
 pub mod rongyuan;
 pub mod sonix;
+pub mod steelseries;
 pub mod vaxee;
 pub mod wlmouse;
 pub mod zowie;
@@ -222,6 +230,14 @@ pub fn clamp100(v: i32) -> i32 {
     v.clamp(0, 100)
 }
 
+/// Mapeia lo..hi para 0..100 linearmente, com limite.
+pub fn map_to_100(v: i32, lo: i32, hi: i32) -> i32 {
+    if hi <= lo {
+        return -1;
+    }
+    clamp100((v - lo) * 100 / (hi - lo))
+}
+
 /// Interpolacao linear por partes em (mv[i], pct[i]); tabelas em ordem decrescente de tensao.
 pub fn interpolate(mv: i32, mv_table: &[i32], pct_table: &[i32]) -> i32 {
     if mv >= mv_table[0] {
@@ -296,5 +312,6 @@ mod tests {
         assert_eq!(interpolate(3800, &[4200, 3800, 3500], &[100, 50, 0]), 50);
         assert_eq!(interpolate(4000, &[4200, 3800, 3500], &[100, 50, 0]), 75);
         assert_eq!(sum8(&[0x13, 0x4A]), 0x5D);
+        assert_eq!(map_to_100(0x7F, 0x64, 0x9A), 50);
     }
 }

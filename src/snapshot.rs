@@ -36,7 +36,7 @@ pub fn run(dir: &Path) {
         let items: Vec<_> = readings.iter().map(|r| (r.kind, r.status)).collect();
         let mut out = None;
         unsafe {
-            render::render(&items, DPI, HEIGHT, light, |_, width, px| out = Some((width, px.to_vec())));
+            render::render(&items, DPI, render::Layout::Row { height: HEIGHT }, light, |_, width, _, px| out = Some((width, px.to_vec())));
         }
         let Some((width, px)) = out else { continue };
         let path = dir.join(format!("{name}.png"));

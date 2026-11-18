@@ -16,7 +16,7 @@ fn own_readers(api: &crate::hid::HidApi) -> Vec<(u16, u16)> {
     let mut v: Vec<(u16, u16)> = api
         .device_list()
         .map(|c| (c.vendor_id(), c.product_id()))
-        .filter(|&(vid, pid)| (vid == LOGITECH_VID && pid != 0x0ADF) || vid == MCHOSE_VID || (vid, pid) == MCHOSE_WIRED || playstation::is_controller(vid, pid))
+        .filter(|&(vid, pid)| (vid == LOGITECH_VID && pid != 0x0ADF) || vid == MCHOSE_VID || (vid, pid) == MCHOSE_WIRED || (vid, pid) == mchose::X9 || playstation::is_controller(vid, pid))
         .collect();
     v.sort_unstable();
     v.dedup();
@@ -57,7 +57,7 @@ impl Scanner {
             if let Some(exe) = headsetcontrol::find() {
                 // Nao lista de novo o que ja tem leitor proprio.
                 let skip = |vid: u16, pid: u16| {
-                    vid == MCHOSE_VID || (vid, pid) == MCHOSE_WIRED || (vid == LOGITECH_VID && obs.iter().any(|o| o.id.starts_with(&format!("logi:{pid:04x}:"))))
+                    vid == MCHOSE_VID || (vid, pid) == MCHOSE_WIRED || (vid, pid) == mchose::X9 || (vid == LOGITECH_VID && obs.iter().any(|o| o.id.starts_with(&format!("logi:{pid:04x}:"))))
                 };
                 self.slow.extend(headsetcontrol::scan(&exe, skip));
             }

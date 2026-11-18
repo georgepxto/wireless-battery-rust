@@ -146,10 +146,20 @@ impl Hidpp for Link {
         tx[3] = func_sw;
         let n = params.len().min(16);
         tx[4..4 + n].copy_from_slice(&params[..n]);
+        let mut rx = [0u8; 64];
+        // Descarta respostas atrasadas de pedidos anteriores (um mouse que acordou e respondeu
+        // depois do timeout). As consultas a raiz (indice 0) nao ecoam o id da feature, entao uma
+        // resposta velha seria tomada como a deste pedido. (renanleonel, 9ac2d7c)
+        for dev in self.short.iter().chain([&self.long]) {
+            for _ in 0..64 {
+                if dev.read_timeout(&mut rx, 0)? == 0 {
+                    break;
+                }
+            }
+        }
         self.long.write(&tx)?;
 
         let deadline = Instant::now() + TIMEOUT;
-        let mut rx = [0u8; 64];
         loop {
             if let Some(short) = &self.short {
                 loop {

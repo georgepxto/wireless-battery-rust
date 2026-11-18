@@ -62,7 +62,10 @@ struct App {
     tooltip: HWND,
     taskbar_created: u32,
     light: bool,
-    width: i32,
+    /// Tamanho do widget desenhado; (0, 0) quando nao ha nada para mostrar.
+    size: (i32, i32),
+    /// Disposicao da barra para a qual o bitmap atual foi desenhado.
+    layout: Option<render::Layout>,
 }
 
 thread_local! {
@@ -73,7 +76,8 @@ thread_local! {
             tooltip: null_mut(),
             taskbar_created: 0,
             light: false,
-            width: 0,
+            size: (0, 0),
+            layout: None,
         })
     };
 }
@@ -272,7 +276,8 @@ unsafe fn ensure_widget() {
     with(|a| {
         a.widget = w;
         a.tooltip = tip;
-        a.width = 0;
+        a.size = (0, 0);
+        a.layout = None;
     });
     redraw();
 }
@@ -325,51 +330,74 @@ unsafe fn redraw() {
     if tray.is_null() {
         return;
     }
-    let mut tr: RECT = zeroed();
-    GetWindowRect(tray, &mut tr);
+    let layout = taskbar_layout(tray);
     let dpi = GetDpiForWindow(tray).max(96);
     let shown = shown(readings());
     set_tooltip_text(&shown.iter().map(|r| format!("{}: {}", r.name, r.status)).collect::<Vec<_>>());
     let items: Vec<_> = shown.iter().map(|r| (r.kind, r.status)).collect();
-    let width = if items.is_empty() { 0 } else { render::draw(widget, &items, dpi, tr.bottom - tr.top, light) };
-    with(|a| a.width = width);
+    let size = if items.is_empty() { (0, 0) } else { render::draw(widget, &items, dpi, layout, light) };
+    with(|a| {
+        a.size = size;
+        a.layout = Some(layout);
+    });
     place();
 }
 
-/// Mantem o widget logo a esquerda da area de notificacao e acima do conteudo XAML da barra.
-unsafe fn place() {
-    let (widget, width) = with(|a| (a.widget, a.width));
-    if widget.is_null() || IsWindow(widget) == 0 {
-        return;
+/// Barra presa a esquerda/direita e mais alta que larga: o widget vira uma coluna.
+unsafe fn taskbar_layout(tray: HWND) -> render::Layout {
+    let mut tr: RECT = zeroed();
+    GetWindowRect(tray, &mut tr);
+    let (w, h) = (tr.right - tr.left, tr.bottom - tr.top);
+    if h > w {
+        render::Layout::Column { width: w }
+    } else {
+        render::Layout::Row { height: h }
     }
-    if width == 0 {
-        ShowWindow(widget, SW_HIDE); // nada para mostrar
+}
+
+/// Mantem o widget junto da area de notificacao (a esquerda dela numa barra horizontal, acima
+/// numa vertical) e acima do conteudo XAML da barra.
+unsafe fn place() {
+    let (widget, (width, height), rendered) = with(|a| (a.widget, a.size, a.layout));
+    if widget.is_null() || IsWindow(widget) == 0 {
         return;
     }
     let tray = find_tray();
     if tray.is_null() {
         return;
     }
+    // A barra mudou de borda ou de tamanho: o bitmap foi desenhado para o formato antigo.
+    if rendered != Some(taskbar_layout(tray)) {
+        redraw(); // grava a disposicao nova e volta aqui
+        return;
+    }
+    if width == 0 {
+        ShowWindow(widget, SW_HIDE); // nada para mostrar
+        return;
+    }
     let mut tr: RECT = zeroed();
     GetWindowRect(tray, &mut tr);
+    let mut nr: RECT = zeroed();
     let notify = FindWindowExW(tray, null_mut(), wide("TrayNotifyWnd").as_ptr(), null());
-    let mut right = tr.right;
-    if !notify.is_null() {
-        let mut nr: RECT = zeroed();
-        GetWindowRect(notify, &mut nr);
-        if nr.right > nr.left {
-            right = nr.left;
-        }
-    }
+    let has_notify = !notify.is_null() && GetWindowRect(notify, &mut nr) != 0 && nr.right > nr.left;
     let margin = 4 * GetDpiForWindow(tray).max(96) as i32 / 96;
-    let (x, h) = (right - tr.left - width - margin, tr.bottom - tr.top);
+    let (x, y) = match rendered {
+        Some(render::Layout::Column { .. }) => {
+            let bottom = if has_notify { nr.top } else { tr.bottom };
+            (0, bottom - tr.top - height - margin)
+        }
+        _ => {
+            let right = if has_notify { nr.left } else { tr.right };
+            (right - tr.left - width - margin, 0)
+        }
+    };
 
     let mut cur: RECT = zeroed();
     GetWindowRect(widget, &mut cur);
-    let moved = cur.left - tr.left != x || cur.top != tr.top || cur.right - cur.left != width || cur.bottom - cur.top != h;
+    let moved = cur.left - tr.left != x || cur.top - tr.top != y || cur.right - cur.left != width || cur.bottom - cur.top != height;
     let on_top = GetWindow(tray, GW_CHILD) == widget;
     if moved || !on_top || IsWindowVisible(widget) == 0 {
-        SetWindowPos(widget, HWND_TOP, x, 0, width, h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        SetWindowPos(widget, HWND_TOP, x, y, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
     }
 }
 
