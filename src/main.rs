@@ -7,6 +7,7 @@
 //!   wireless-battery.exe --once    imprime os dispositivos encontrados e sai
 //!                                  (com --verbose, tambem as respostas brutas)
 //!   wireless-battery.exe --hid     lista todas as interfaces HID (diagnostico)
+//!   wireless-battery.exe --bt      lista os dispositivos Bluetooth e a bateria que o Windows guarda
 
 mod bluetooth;
 mod device;
@@ -23,6 +24,7 @@ mod probe;
 mod render;
 mod scan;
 mod settings;
+mod update;
 #[cfg(feature = "snapshot")]
 mod snapshot;
 mod widget;
@@ -65,6 +67,18 @@ fn main() {
             }
             for r in readings {
                 println!("{:<10} {:<36} {:<20} [{}]", format!("{:?}", r.kind), r.name, r.status.to_string(), r.id);
+            }
+        }
+        Some("--bt") => {
+            attach_console();
+            bluetooth::dump();
+        }
+        Some("--check-update") => {
+            attach_console();
+            match update::check() {
+                Ok(Some(r)) => println!("Nova versao: v{} ({})", r.version, r.url),
+                Ok(None) => println!("Ja esta na versao mais recente (v{}).", update::CURRENT),
+                Err(e) => println!("Erro: {e}"),
             }
         }
         Some("--hid") => {

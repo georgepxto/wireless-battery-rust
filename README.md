@@ -35,8 +35,10 @@ taskbar widget.</sub>
   Explorer restarts.
 - **Pauses while you play**: no device is queried while a game or any other app is full screen.
 - **Lightweight**: a single executable of about 500 KB, written in Rust with plain Win32 for the
-  UI. No network access, no telemetry.
+  UI. No telemetry; the network is only used when you check for updates.
 - **Start with Windows** (optional, from the menu).
+- **Built-in updater**: check for a new version from the menu and install it in place, without
+  downloading anything by hand.
 
 ## What you see
 
@@ -148,6 +150,10 @@ Click the widget (left or right button) to open the menu:
 - **Atualizar agora**: read every device now.
 - **Avisos de bateria baixa**: turn the low-battery notification on or off.
 - **Iniciar com o Windows**: start with Windows.
+- **Procurar atualizações** (check for updates): asks GitHub for the latest release. If there is a
+  newer version, it downloads `wireless-battery.exe`, checks it against the SHA-256 published with
+  the release, replaces the running executable in place and restarts. The previous executable is
+  kept as `wireless-battery.old` until the next start.
 - **Sair**: exit.
 
 Hover the widget to see each device's full name and status.
@@ -162,6 +168,8 @@ wireless-battery.exe --demo    # widget with sample readings covering every stat
 wireless-battery.exe --once    # print the devices found and exit
 wireless-battery.exe --once --verbose   # same, plus the raw replies of the MCHOSE and AULA readers
 wireless-battery.exe --hid     # list every HID interface (VID:PID, usage page), for diagnostics
+wireless-battery.exe --bt      # list every Bluetooth device node and the battery level Windows stored
+wireless-battery.exe --check-update   # print whether a newer release exists
 ```
 
 Only one instance runs at a time: exit the running widget before starting `--demo`.
@@ -189,7 +197,7 @@ Only one instance runs at a time: exit the running widget before starting `--dem
 | Device plugged in or out, PC resumed from sleep | read immediately |
 | Game or app in full screen | **no reads at all**; one check every 10 s to see if it ended, then everything is read at once |
 | Memory | the working set is handed back to Windows after each read; the app is idle in between |
-| Network | none |
+| Network | none, except when you choose **Procurar atualizações** (one request to the GitHub API, plus the download) |
 
 Each HID read is a few packets of 20 to 64 bytes and takes a few milliseconds. Between reads the
 thread is idle.

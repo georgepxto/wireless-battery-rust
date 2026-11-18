@@ -51,7 +51,7 @@ pub fn scan() -> Vec<Observation> {
 }
 
 fn debug(msg: &str) {
-    if cfg!(debug_assertions) {
+    if cfg!(debug_assertions) || crate::verbose() {
         eprintln!("[bt] {msg}");
     }
 }
@@ -155,7 +155,9 @@ fn scan_classic(out: &mut Vec<Observation>) {
     let nodes = nodes("BTHENUM");
     let mut seen = HashSet::new();
     for node in &nodes {
-        let (Some(percent), Some(addr)) = (node.level, address_from_instance_id(&node.id)) else { continue };
+        // O nivel fica num no de perfil (HFP) ou, em alguns fones, no proprio no do dispositivo.
+        let addr = device_address(&node.id).or_else(|| address_from_instance_id(&node.id));
+        let (Some(percent), Some(addr)) = (node.level, addr) else { continue };
         if !seen.insert(addr) {
             continue; // one device has several profile nodes
         }
@@ -182,6 +184,18 @@ fn scan_classic(out: &mut Vec<Observation>) {
             kind: Some(kind),
             state: if connected { State::Battery { percent: percent.min(100), charging: false } } else { State::Off },
         });
+    }
+}
+
+/// `--bt`: todos os nos Bluetooth presentes com as propriedades que o leitor usa.
+pub fn dump() {
+    for e in ["BTHENUM", "BTHLE"] {
+        for n in nodes(e) {
+            println!(
+                "{}\n    nome={:?} conectado={:?} classe={:?} bateria={:?}",
+                n.id, n.name.as_deref().unwrap_or(""), n.connected, n.class.map(|c| format!("{c:06X}")), n.level
+            );
+        }
     }
 }
 
@@ -260,6 +274,8 @@ mod tests {
             Some(0xF5CFD77BCB0B)
         );
         assert_eq!(device_address(r"BTHLE\GENERIC_ATTRIBUTE\7&1"), None);
+        // No do dispositivo: o endereco vem do DEV_ (o sufixo BLUETOOTHDEVICE_ nao serve).
+        assert_eq!(address_from_instance_id(r"BTHENUM\DEV_F5CFD77BCB0B\7&3057B904&0&BLUETOOTHDEVICE_F5CFD77BCB0B"), None);
         // Profile nodes carry the battery level but aren't device nodes.
         assert_eq!(device_address(r"BTHENUM\{0000111E-0000-1000-8000-00805F9B34FB}_VID&0001004C_PID&2014\7&3057B904&0&F5CFD77BCB0B_C00000000"), None);
         assert_eq!(

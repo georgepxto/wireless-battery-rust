@@ -20,7 +20,7 @@ impl Kind {
         let n = name.to_ascii_lowercase();
         if ["headset", "headphone", "airpods max"].iter().any(|k| n.contains(k)) {
             Kind::Headset
-        } else if ["earbud", "buds", "airpods", "earphone", "in-ear"].iter().any(|k| n.contains(k)) {
+        } else if ["earbud", "buds", "airpods", "earphone", "in-ear", "liberty", "space a40", "pixel buds", "wf-"].iter().any(|k| n.contains(k)) {
             Kind::Earbuds
         } else if ["mouse", "mice", "trackball", "superlight"].iter().any(|k| n.contains(k)) {
             Kind::Mouse

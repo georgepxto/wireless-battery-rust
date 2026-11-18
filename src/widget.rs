@@ -9,7 +9,7 @@
 use crate::device::{Kind, Reading, Status};
 use crate::scan::Scanner;
 use crate::settings::{self, Display};
-use crate::{init_com, notify, render, wide};
+use crate::{init_com, notify, render, update, wide};
 use std::cell::RefCell;
 use std::mem::{size_of, zeroed};
 use std::ptr::{null, null_mut};
@@ -28,6 +28,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 const WM_APP_UPDATE: u32 = WM_APP + 1;
 const WM_APP_MENU: u32 = WM_APP + 2;
+/// A atualizacao foi instalada e o novo executavel ja abriu: fecha este.
+const WM_APP_QUIT: u32 = WM_APP + 3;
 const TIMER_PLACE: usize = 1;
 /// WM_POWERBROADCAST: voltou da suspensao/hibernacao.
 const PBT_APMRESUMEAUTOMATIC: usize = 0x12;
@@ -37,6 +39,7 @@ const CMD_AUTOSTART: usize = 2;
 const CMD_EXIT: usize = 3;
 const CMD_ALERTS: usize = 4;
 const CMD_SHOW_ALL: usize = 5;
+const CMD_UPDATE: usize = 6;
 /// Marcar/desmarcar dispositivo no modo "todos".
 const CMD_TOGGLE_BASE: usize = 100;
 /// "Somente este dispositivo".
@@ -83,10 +86,22 @@ fn with<R>(f: impl FnOnce(&mut App) -> R) -> R {
 pub fn run() {
     unsafe {
         let mutex_name = wide(r"Local\WirelessBatteryTray");
-        CreateMutexW(null(), 0, mutex_name.as_ptr());
-        if GetLastError() == ERROR_ALREADY_EXISTS {
-            return; // ja esta rodando
+        // Depois de uma atualizacao, a versao antiga ainda pode estar fechando.
+        let updated = std::env::args().any(|a| a == "--updated");
+        let mut tries = if updated { 50 } else { 1 };
+        loop {
+            let m = CreateMutexW(null(), 0, mutex_name.as_ptr());
+            if GetLastError() != ERROR_ALREADY_EXISTS {
+                break;
+            }
+            tries -= 1;
+            if tries == 0 {
+                return; // ja esta rodando
+            }
+            CloseHandle(m);
+            std::thread::sleep(Duration::from_millis(200));
         }
+        update::cleanup();
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         settings::refresh_autostart_path();
         settings::register_app_id();
@@ -404,6 +419,8 @@ unsafe fn show_menu(hwnd: HWND) {
     add(menu, MF_STRING, CMD_REFRESH, "Atualizar agora");
     add(menu, MF_STRING | checked(settings::alerts_enabled()), CMD_ALERTS, "Avisos de bateria baixa");
     add(menu, MF_STRING | checked(settings::autostart_enabled()), CMD_AUTOSTART, "Iniciar com o Windows");
+    let busy = UPDATING.load(std::sync::atomic::Ordering::Relaxed);
+    add(menu, MF_STRING | if busy { MF_GRAYED } else { 0 }, CMD_UPDATE, &format!("Procurar atualizações (v{})", update::CURRENT));
     AppendMenuW(menu, MF_SEPARATOR, 0, null());
     add(menu, MF_STRING, CMD_EXIT, "Sair");
 
@@ -420,17 +437,20 @@ unsafe fn show_menu(hwnd: HWND) {
         CMD_REFRESH => wake(),
         CMD_AUTOSTART => settings::set_autostart(!settings::autostart_enabled()),
         CMD_ALERTS => settings::set_alerts(!settings::alerts_enabled()),
+        CMD_UPDATE => {
+            if !UPDATING.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                let controller = hwnd as usize;
+                std::thread::spawn(move || {
+                    run_update(controller);
+                    UPDATING.store(false, std::sync::atomic::Ordering::Relaxed);
+                });
+            }
+        }
         CMD_SHOW_ALL => {
             settings::set_display(&Display::All);
             redraw();
         }
-        CMD_EXIT => {
-            let widget = with(|a| a.widget);
-            if !widget.is_null() {
-                DestroyWindow(widget);
-            }
-            DestroyWindow(hwnd);
-        }
+        CMD_EXIT => quit(hwnd),
         c if c >= CMD_ONLY_BASE => {
             if let Some(r) = devices.get(c - CMD_ONLY_BASE) {
                 settings::set_display(&Display::Only(r.id.clone()));
@@ -444,6 +464,52 @@ unsafe fn show_menu(hwnd: HWND) {
             }
         }
         _ => {}
+    }
+}
+
+unsafe fn quit(controller: HWND) {
+    let widget = with(|a| a.widget);
+    if !widget.is_null() {
+        DestroyWindow(widget);
+    }
+    DestroyWindow(controller);
+}
+
+static UPDATING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn message(text: &str, flags: MESSAGEBOX_STYLE) -> MESSAGEBOX_RESULT {
+    let (t, c) = (wide(text), wide("Wireless Battery"));
+    unsafe { MessageBoxW(null_mut(), t.as_ptr(), c.as_ptr(), flags | MB_SETFOREGROUND | MB_TOPMOST) }
+}
+
+/// Roda fora da thread da interface: a consulta e o download podem levar alguns segundos.
+fn run_update(controller: usize) {
+    let rel = match update::check() {
+        Err(e) => {
+            message(&format!("Não foi possível procurar atualizações: {e}."), MB_ICONWARNING);
+            return;
+        }
+        Ok(None) => {
+            message(&format!("Você já está na versão mais recente (v{}).", update::CURRENT), MB_ICONINFORMATION);
+            return;
+        }
+        Ok(Some(rel)) => rel,
+    };
+    let ask = format!("A versão v{} está disponível (você tem a v{}).\n\nBaixar e instalar agora? O app reinicia sozinho.", rel.version, update::CURRENT);
+    if message(&ask, MB_YESNO | MB_ICONQUESTION) != IDYES {
+        return;
+    }
+    match update::install(&rel) {
+        Ok(exe) if update::restart(&exe) => unsafe {
+            PostMessageW(controller as HWND, WM_APP_QUIT, 0, 0);
+        },
+        Ok(_) => {
+            message(&format!("A v{} foi instalada. Abra o Wireless Battery de novo para usá-la.", rel.version), MB_ICONINFORMATION);
+            unsafe { PostMessageW(controller as HWND, WM_APP_QUIT, 0, 0) };
+        }
+        Err(e) => {
+            message(&format!("A atualização falhou: {e}.\n\nA versão atual continua instalada."), MB_ICONWARNING);
+        }
     }
 }
 
@@ -470,6 +536,7 @@ unsafe extern "system" fn controller_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: 
             return 1;
         }
         WM_APP_MENU => show_menu(hwnd),
+        WM_APP_QUIT => quit(hwnd),
         WM_DESTROY => PostQuitMessage(0),
         m if m == taskbar_created && m != 0 => {
             // Explorer reiniciou: o widget antigo morreu com a barra antiga.
