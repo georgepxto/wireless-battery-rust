@@ -5,7 +5,7 @@ mod curve;
 pub mod hidpp;
 
 use crate::device::{Kind, Observation, State};
-use hidapi::HidApi;
+use crate::hid::HidApi;
 use hidpp::{Endpoint, Error, Hidpp, Link, ERR_UNKNOWN_DEVICE};
 use std::collections::HashMap;
 

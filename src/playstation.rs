@@ -16,7 +16,7 @@
 //! them; until then the battery isn't available and the controller isn't shown.
 
 use crate::device::{Kind, Observation, State};
-use hidapi::{HidApi, HidDevice};
+use crate::hid::{HidApi, HidDevice};
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
@@ -24,6 +24,10 @@ const SONY: u16 = 0x054C;
 const DUALSHOCK4: &[u16] = &[0x05C4, 0x09CC, 0x0BA0];
 const DUALSENSE: u16 = 0x0CE6;
 const DUALSENSE_EDGE: u16 = 0x0DF2;
+
+pub fn is_controller(vid: u16, pid: u16) -> bool {
+    vid == SONY && (DUALSHOCK4.contains(&pid) || pid == DUALSENSE || pid == DUALSENSE_EDGE)
+}
 const READ_WINDOW: Duration = Duration::from_millis(300);
 
 pub fn scan(api: &HidApi) -> Vec<Observation> {

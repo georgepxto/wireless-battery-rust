@@ -1,5 +1,13 @@
 # Código e protocolos de terceiros
 
+## krisgfx9/Wireless-Device-Battery-Monitor (GPL-3.0)
+https://github.com/krisgfx9/Wireless-Device-Battery-Monitor
+
+Os leitores em `src/drivers/` são portados dos drivers em C++ desse projeto, e a semântica de
+`src/hid.rs` (report id, tamanhos dos reports, abertura só de feature) segue o `hid.cpp` dele.
+Por isso o projeto inteiro passou a ser distribuído sob a GPL-3.0; o texto completo está em
+[LICENSE](LICENSE). Cada arquivo de `src/drivers/` cita as fontes dos protocolos.
+
 ## renanleonel/windows-taskbar-battery (MIT)
 https://github.com/renanleonel/windows-taskbar-battery
 

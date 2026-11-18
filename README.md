@@ -24,6 +24,7 @@ taskbar widget.</sub>
 - [Limitations](#limitations)
 - [Building from source](#building-from-source)
 - [Credits](#credits)
+- [License](#license)
 
 ## Features
 
@@ -79,6 +80,23 @@ from the taskbar and listed as "desconectado" in the menu.
 | **Xbox and XInput-compatible controllers** | Xbox Wireless adapter, Bluetooth or USB | `Windows.Gaming.Input` battery report |
 | **DualSense, DualSense Edge, DualShock 4** | USB or Bluetooth | The controller's own input report (10% steps) |
 | **SteelSeries, HyperX, Corsair, Audeze, Roccat** and other headsets | USB dongle | [HeadsetControl](#other-headsets-headsetcontrol), optional |
+
+### More brands (new in 0.8.0, ported from Wireless-Device-Battery-Monitor)
+
+These readers are ported from [krisgfx9/Wireless-Device-Battery-Monitor](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor)
+and use each vendor's own receiver protocol. Most of them have been verified on hardware by that
+project, but not yet with this app. Reports are welcome.
+
+- **Mice**: Kysona, Pulsar (including XS-1), ATK / VXE (Dragonfly R1 family), Hitscan, G-Wolves,
+  Glorious (Model O/D/I 2 and others), Lamzu, Endgame Gear, VAXEE, WLmouse, Ninjutso Sora V2,
+  Sprime PM1, MCHOSE mice, Dareu, Rapoo VT series, Redragon (Compx and Areson receivers),
+  Fantech Helios Go XD5, Motospeed X6, Delux M800 / M900, Attack Shark, Ajazz, Incott, Wraith W1,
+  RK MG6 Pro, ZOWIE EC-CW / DW / U2, ASUS ROG, Razer.
+- **Keyboards**: AULA (more receivers), Keychron (classic, 8K, 4K, Nape), Rongyuan-based boards,
+  SONiX-based boards, Razer.
+- **Headsets**: HyperX (Cloud III, III S, II, II Core, Alpha, Alpha 2, Flight, Stinger Core),
+  Logitech G435 (`046D:0ADF` dongle), Sony INZONE (H9 II, H5, Buds), Jabra, JBL Quantum, Fractal
+  Scape, ASUS ROG.
 
 ### Tested on real hardware
 
@@ -197,7 +215,7 @@ thread is idle.
   controller to Windows as a wired Xbox controller with a fixed "full" battery, unrelated to the
   real level. The app ignores that value, so the controller is not shown on the dongle. Over
   Bluetooth in PC mode it appears as an Xbox controller.
-- **AULA**: only the F75 receiver (`3554:FA09`) is recognized. On the USB cable the keyboard reports
+- **AULA**: on the USB cable the keyboard reports
   "charging" without a percentage.
 - **MCHOSE**: only the V9 Pro protocol is known. Other MCHOSE headsets with the same interface may
   work, but are untested. While the USB cable is plugged in, the headset stops talking through the
@@ -230,7 +248,8 @@ Notes:
   rustup ships without `windres`. To regenerate it after changing `res/app.rc`,
   `res/app.manifest` or `res/app.ico`:
   `x86_64-w64-mingw32-windres res/app.rc -O coff -o res/resources.o`.
-- `hidapi` is pinned to 2.6.4, the last version that doesn't require `dlltool`.
+- HID access is done directly through the Windows HID API (`src/hid.rs`), so no `hidapi` or
+  `dlltool` is needed.
 
 ### Regenerating the screenshots
 
@@ -275,10 +294,18 @@ Actions tab with a version.
 - **[TrafficMonitor](https://github.com/zhongyang219/TrafficMonitor)**: the taskbar child-window
   technique.
 - **[Wireless-Device-Battery-Monitor](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor)**
-  by krisgfx9: the inspiration behind taskbar-battery, and a broader tool if your device isn't
-  supported here.
+  by krisgfx9 (GPL-3.0): the vendor readers in `src/drivers/` (Kysona, Pulsar, Glorious, Razer,
+  HyperX and the other brands listed above) are ported from its C++ drivers, together with the
+  retry logic of the new AULA reader and the way the HID layer handles report ids. Each file names
+  the protocol sources it credits.
 
 Full license texts of the third-party code are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+## License
+
+Since version 0.8.0 this project is licensed under the **GNU General Public License v3.0**
+([LICENSE](LICENSE)), because it includes code ported from Wireless-Device-Battery-Monitor. The
+MIT-licensed parts taken from other projects keep their original notices.
 
 This project is not affiliated with or endorsed by Logitech, MCHOSE, AULA, Machenike, Sony,
 Microsoft, Apple or any other brand mentioned. All trademarks belong to their owners.

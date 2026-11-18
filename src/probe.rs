@@ -2,17 +2,17 @@
 //! testando as combinacoes de pedido de bateria e imprimindo tudo o que chegar em
 //! qualquer colecao HID. Baseado no `--probe` do jmjp/mchose-hub-native (MIT).
 
-use hidapi::{HidApi, HidDevice};
+use crate::hid::{HidApi, HidDevice};
 use std::time::{Duration, Instant};
 
 /// Dongle MCHOSE (291D) e o headset pelo cabo USB (chip C-Media, 0D8C, nome "MCHOSE").
-fn is_mchose(d: &hidapi::DeviceInfo) -> bool {
+fn is_mchose(d: &crate::hid::DeviceInfo) -> bool {
     d.vendor_id() == 0x291D || (d.vendor_id() == 0x0D8C && d.product_string().unwrap_or("").to_uppercase().contains("MCHOSE"))
 }
 
 pub fn run() {
     let Ok(api) = HidApi::new() else {
-        println!("hidapi falhou");
+        println!("HID falhou");
         return;
     };
     let mut ids: Vec<(u16, u16)> = api.device_list().filter(|d| is_mchose(d)).map(|d| (d.vendor_id(), d.product_id())).collect();

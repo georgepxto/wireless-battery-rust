@@ -13,7 +13,7 @@
 //!   Os dois viram um unico dispositivo, com a melhor leitura entre eles.
 
 use crate::device::{Kind, Observation, State};
-use hidapi::{DeviceInfo, HidApi, HidDevice};
+use crate::hid::{DeviceInfo, HidApi, HidDevice};
 use std::time::{Duration, Instant};
 
 const DONGLE_VID: u16 = 0x291D;

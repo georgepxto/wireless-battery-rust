@@ -10,6 +10,8 @@ pub enum Kind {
     Mouse,
     Keyboard,
     Gamepad,
+    #[allow(dead_code)] // usado pelo leitor do Phone Link (em breve)
+    Phone,
     Other,
 }
 
@@ -20,12 +22,17 @@ impl Kind {
             Kind::Headset
         } else if ["earbud", "buds", "airpods", "earphone", "in-ear"].iter().any(|k| n.contains(k)) {
             Kind::Earbuds
-        } else if n.contains("mouse") || n.contains("superlight") {
+        } else if ["mouse", "mice", "trackball", "superlight"].iter().any(|k| n.contains(k)) {
             Kind::Mouse
         } else if n.contains("keyboard") || n.contains("keys") || n.ends_with(" kb") {
             Kind::Keyboard
-        } else if n.contains("controller") || n.contains("gamepad") {
+        } else if ["controller", "gamepad", "xbox", "dualsense", "dualshock", "joy-con"].iter().any(|k| n.contains(k)) {
             Kind::Gamepad
+        } else if ["arctis", "cloud", "void", "virtuoso", "blackshark", "barracuda", "quantum", "inzone"]
+            .iter()
+            .any(|k| n.contains(k))
+        {
+            Kind::Headset
         } else {
             Kind::Other
         }
@@ -44,7 +51,7 @@ pub enum State {
     Off,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Observation {
     /// Stable per device across scans, e.g. "logi:c539:2:01" or "ble:f4ee25fbba46".
     pub id: String,

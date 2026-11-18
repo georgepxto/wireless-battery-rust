@@ -6,7 +6,7 @@
 //! long collection but also listen on the short one: receivers answer some errors (e.g. "no
 //! device in this slot") with short HID++ 1.0 reports.
 
-use hidapi::{HidApi, HidDevice};
+use crate::hid::{HidApi, HidDevice};
 use std::ffi::CString;
 use std::fmt;
 use std::time::{Duration, Instant};
@@ -25,15 +25,15 @@ pub const ERR_UNKNOWN_DEVICE: u8 = 0x08;
 
 #[derive(Debug)]
 pub enum Error {
-    Hid(hidapi::HidError),
+    Hid(crate::hid::HidError),
     /// No reply in time (device asleep or off).
     Timeout,
     /// Device or receiver returned an HID++ error code.
     Protocol(u8),
 }
 
-impl From<hidapi::HidError> for Error {
-    fn from(e: hidapi::HidError) -> Self {
+impl From<crate::hid::HidError> for Error {
+    fn from(e: crate::hid::HidError) -> Self {
         Error::Hid(e)
     }
 }

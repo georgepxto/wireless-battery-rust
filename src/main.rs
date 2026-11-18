@@ -8,10 +8,11 @@
 //!                                  (com --verbose, tambem as respostas brutas)
 //!   wireless-battery.exe --hid     lista todas as interfaces HID (diagnostico)
 
-mod aula;
 mod bluetooth;
 mod device;
+mod drivers;
 mod headsetcontrol;
+mod hid;
 mod json;
 mod logitech;
 mod mchose;
@@ -68,7 +69,7 @@ fn main() {
         }
         Some("--hid") => {
             attach_console();
-            match hidapi::HidApi::new() {
+            match crate::hid::HidApi::new() {
                 Ok(api) => {
                     for d in api.device_list() {
                         println!(
@@ -78,7 +79,7 @@ fn main() {
                         );
                     }
                 }
-                Err(e) => println!("hidapi: {e}"),
+                Err(e) => println!("HID: {e}"),
             }
         }
         #[cfg(feature = "probe")]

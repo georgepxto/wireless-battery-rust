@@ -25,6 +25,7 @@ fn icon(kind: Kind) -> &'static str {
         Kind::Mouse => "\u{E962}",
         Kind::Keyboard => "\u{E765}",
         Kind::Gamepad => "\u{E7FC}",
+        Kind::Phone => "\u{E8EA}", // cellphone
         Kind::Other => "\u{E83F}", // battery
     }
 }
