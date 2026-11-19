@@ -7,6 +7,8 @@ on:
 jobs:
   test:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -31,3 +33,16 @@ jobs:
         with:
           name: snapshots
           path: snapshots/*.png
+
+      # As mesmas capturas num branch a parte, para conferir o desenho sem baixar o artefato.
+      - name: Publicar capturas no branch ci-snapshots
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          cd snapshots
+          git init -q -b ci-snapshots
+          git config user.name "github-actions"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add *.png
+          git commit -q -m "Capturas de ${{ github.sha }}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-snapshots
