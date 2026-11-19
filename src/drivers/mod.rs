@@ -48,6 +48,12 @@ const ORDER: &[(&str, Poll)] = &[
     ("steelseries", steelseries::poll),
     ("corsair", corsair::poll),
     ("coolermaster", coolermaster::poll),
+    ("switch_pro", switch_pro::poll),
+    ("steam_controller", steam_controller::poll),
+    ("gamesir", gamesir::poll),
+    ("flydigi", flydigi::poll),
+    ("eightbitdo", eightbitdo::poll),
+    ("beitong", beitong::poll),
     ("generic", generic::poll),
 ];
 
@@ -69,6 +75,12 @@ pub fn poll_all(api: &HidApi, claimed: &[(u16, u16)]) -> Vec<Observation> {
 }
 
 pub mod areson;
+pub mod beitong;
+pub mod eightbitdo;
+pub mod flydigi;
+pub mod gamesir;
+pub mod steam_controller;
+pub mod switch_pro;
 pub mod atk;
 pub mod coolermaster;
 pub mod corsair;

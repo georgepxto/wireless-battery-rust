@@ -10,6 +10,7 @@
 //!   wireless-battery.exe --bt      lista os dispositivos Bluetooth e a bateria que o Windows guarda
 
 mod bluetooth;
+mod brands;
 mod device;
 mod drivers;
 mod headsetcontrol;

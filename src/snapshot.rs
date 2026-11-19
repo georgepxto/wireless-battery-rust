@@ -33,7 +33,7 @@ pub fn run(dir: &Path) {
     ];
 
     for (name, readings, light) in scenes {
-        let items: Vec<_> = readings.iter().map(|r| (r.kind, r.status)).collect();
+        let items: Vec<_> = readings.iter().map(|r| (r.kind, r.status, crate::brands::brand_of(&r.id, &r.name, r.kind).map(|b| b.color(light)))).collect();
         let mut out = None;
         unsafe {
             render::render(&items, DPI, render::Layout::Row { height: HEIGHT }, light, |_, width, _, px| out = Some((width, px.to_vec())));

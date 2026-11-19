@@ -31,6 +31,10 @@ taskbar widget.</sub>
 - **Taskbar widget** next to the notification area, with an icon and a percentage per device.
 - **Show all devices or only one**, and hide individual devices.
 - **Low-battery notification** when a device drops to 20%, once per discharge.
+- **Brand colors**: devices of 16 known brands (Logitech, Razer, SteelSeries, Corsair, HyperX, ROG,
+  ZOWIE, PlayStation, Xbox, Samsung, Apple, Jabra, JBL, Cooler Master, Steam, Redragon) get their
+  maker's color on the taskbar: the icon with a soft glow and a thin level bar under the
+  percentage (red when low). Can be turned off from the menu.
 - **Follows Windows**: light/dark taskbar theme, DPI scaling, a taskbar docked to the left or
   right (devices stacked in a column), and comes back by itself if Explorer restarts.
 - **Pauses while you play**: no device is queried while a game or any other app is full screen.
@@ -95,6 +99,10 @@ project, but not yet with this app. Reports are welcome.
   Fantech Helios Go XD5, Motospeed X6, Delux M800 / M900, Attack Shark, Ajazz, Incott, Wraith W1,
   RK MG6 Pro, ZOWIE EC-CW / DW / U2, ASUS ROG, Razer, SteelSeries (Aerox, Prime, Rival 3 / 650 / Pro),
   Corsair Slipstream, Cooler Master MM712 / MM731.
+- **Controllers on their own 2.4 GHz dongles** (XInput sees most of them as wired pads, so the
+  level is read from the vendor channel): GameSir Nova / Nova 2 / Nova Lite / Cyclone 2, Flydigi
+  Vader 5 Pro / Apex 5, 8BitDo Ultimate 2 / 2C / 3-mode / Pro 2 / Pro 3 / SN30 Pro / SF30 Pro,
+  BEITONG KP20 / KP40D, Steam Controller, and Switch Pro-compatible pads (while Steam Input is on).
 - **Anything else on USB** that reports its battery the standard HID way (a "Battery Strength" or
   "Absolute State Of Charge" field), read straight from the device's report descriptor.
 - **Keyboards**: AULA (more receivers), Keychron (classic, 8K, 4K, Nape), Rongyuan-based boards,
@@ -154,6 +162,7 @@ Click the widget (left or right button) to open the menu:
   In "only one" mode, the device stays on the taskbar (with "—") even while disconnected.
 - **Atualizar agora**: read every device now.
 - **Avisos de bateria baixa**: turn the low-battery notification on or off.
+- **Cores das marcas** (brand colors): turn the brand colors on or off.
 - **Iniciar com o Windows**: start with Windows.
 - **Procurar atualizações** (check for updates): asks GitHub for the latest release. If there is a
   newer version, it downloads `wireless-battery.exe`, checks it against the SHA-256 published with
@@ -309,7 +318,8 @@ Actions tab with a version.
   technique.
 - **[Wireless-Device-Battery-Monitor](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor)**
   by krisgfx9 (GPL-3.0): the vendor readers in `src/drivers/` (Kysona, Pulsar, Glorious, Razer,
-  HyperX and the other brands listed above) are ported from its C++ drivers, together with the
+  HyperX, the controller dongles and the other brands listed above) are ported from its C++
+  drivers, as are the brand colors, glow and level bar (`src/brands.rs`, from its contributors), together with the
   retry logic of the new AULA reader and the way the HID layer handles report ids. Each file names
   the protocol sources it credits.
 

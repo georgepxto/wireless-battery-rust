@@ -76,6 +76,15 @@ pub fn set_alerts(on: bool) {
     write_dword(APP_KEY, "LowBatteryAlerts", u32::from(on));
 }
 
+/// Icones na cor do fabricante, com brilho e barra de nivel (ligado por padrao).
+pub fn brand_colors_enabled() -> bool {
+    read_dword(APP_KEY, "BrandColors") != Some(0)
+}
+
+pub fn set_brand_colors(on: bool) {
+    write_dword(APP_KEY, "BrandColors", u32::from(on));
+}
+
 /// Registra o AppUserModelID para o Windows aceitar as notificacoes (toasts).
 pub fn register_app_id() {
     let key = format!(r"Software\Classes\AppUserModelId\{}", crate::notify::APP_ID);

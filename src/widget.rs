@@ -40,6 +40,7 @@ const CMD_EXIT: usize = 3;
 const CMD_ALERTS: usize = 4;
 const CMD_SHOW_ALL: usize = 5;
 const CMD_UPDATE: usize = 6;
+const CMD_BRANDS: usize = 7;
 /// Marcar/desmarcar dispositivo no modo "todos".
 const CMD_TOGGLE_BASE: usize = 100;
 /// "Somente este dispositivo".
@@ -158,7 +159,7 @@ pub(crate) fn demo_readings() -> Vec<Reading> {
     vec![
         r("demo:headset", "MCHOSE V9 Pro", Kind::Headset, Status::Battery { percent: 64, charging: true }),
         r("demo:earbuds", "AirPods Pro", Kind::Earbuds, Status::Battery { percent: 12, charging: false }),
-        r("demo:mouse", "PRO X SUPERLIGHT 2", Kind::Mouse, Status::Battery { percent: 87, charging: false }),
+        r("logi:demo", "PRO X SUPERLIGHT 2", Kind::Mouse, Status::Battery { percent: 87, charging: false }),
         r("demo:keyboard", "AULA F75", Kind::Keyboard, Status::Battery { percent: 45, charging: false }),
         r("demo:gamepad", "Xbox Wireless Controller", Kind::Gamepad, Status::ChargingNoLevel),
     ]
@@ -334,13 +335,21 @@ unsafe fn redraw() {
     let dpi = GetDpiForWindow(tray).max(96);
     let shown = shown(readings());
     set_tooltip_text(&shown.iter().map(|r| format!("{}: {}", r.name, r.status)).collect::<Vec<_>>());
-    let items: Vec<_> = shown.iter().map(|r| (r.kind, r.status)).collect();
+    let brands = settings::brand_colors_enabled();
+    let items: Vec<_> = shown.iter().map(|r| (r.kind, r.status, accent(r, brands, light))).collect();
     let size = if items.is_empty() { (0, 0) } else { render::draw(widget, &items, dpi, layout, light) };
     with(|a| {
         a.size = size;
         a.layout = Some(layout);
     });
     place();
+}
+
+fn accent(r: &Reading, on: bool, light: bool) -> Option<u32> {
+    if !on {
+        return None;
+    }
+    crate::brands::brand_of(&r.id, &r.name, r.kind).map(|b| b.color(light))
 }
 
 /// Barra presa a esquerda/direita e mais alta que larga: o widget vira uma coluna.
@@ -446,6 +455,7 @@ unsafe fn show_menu(hwnd: HWND) {
 
     add(menu, MF_STRING, CMD_REFRESH, "Atualizar agora");
     add(menu, MF_STRING | checked(settings::alerts_enabled()), CMD_ALERTS, "Avisos de bateria baixa");
+    add(menu, MF_STRING | checked(settings::brand_colors_enabled()), CMD_BRANDS, "Cores das marcas");
     add(menu, MF_STRING | checked(settings::autostart_enabled()), CMD_AUTOSTART, "Iniciar com o Windows");
     let busy = UPDATING.load(std::sync::atomic::Ordering::Relaxed);
     add(menu, MF_STRING | if busy { MF_GRAYED } else { 0 }, CMD_UPDATE, &format!("Procurar atualizações (v{})", update::CURRENT));
@@ -465,6 +475,10 @@ unsafe fn show_menu(hwnd: HWND) {
         CMD_REFRESH => wake(),
         CMD_AUTOSTART => settings::set_autostart(!settings::autostart_enabled()),
         CMD_ALERTS => settings::set_alerts(!settings::alerts_enabled()),
+        CMD_BRANDS => {
+            settings::set_brand_colors(!settings::brand_colors_enabled());
+            redraw();
+        }
         CMD_UPDATE => {
             if !UPDATING.swap(true, std::sync::atomic::Ordering::Relaxed) {
                 let controller = hwnd as usize;
