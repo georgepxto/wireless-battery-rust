@@ -4,7 +4,7 @@ Battery levels of your wireless mouse, keyboard, headset, earbuds and controller
 Windows taskbar. One small native executable, no vendor software, no installer.
 
 <p align="center">
-  <img src="docs/taskbar-dark.png" alt="Widget on a dark taskbar: headset 64% charging, earbuds 12% (low), mouse 87%, keyboard 45%, controller charging" width="564"><br>
+  <img src="docs/taskbar-dark.png" alt="Widget on a dark taskbar: headset 64% charging, earbuds 12% (low), mouse 87% in Logitech blue with its level bar, keyboard 45%, Xbox controller charging in green" width="564"><br>
   <img src="docs/taskbar-light.png" alt="The same widget on a light taskbar" width="564">
 </p>
 
@@ -71,7 +71,7 @@ from the taskbar and listed as "desconectado" in the menu.
 
 | Dark taskbar | Light taskbar |
 |:---:|:---:|
-| <img src="docs/single-dark.png" alt="Only the mouse, dark taskbar" width="166"> | <img src="docs/single-light.png" alt="Only the mouse, light taskbar" width="166"> |
+| <img src="docs/single-dark.png" alt="Only the mouse, dark taskbar" width="110"> | <img src="docs/single-light.png" alt="Only the mouse, light taskbar" width="110"> |
 
 ## Supported devices
 
