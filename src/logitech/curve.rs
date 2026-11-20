@@ -49,7 +49,7 @@ impl Curves {
     pub fn percent(&self, pids: &[u16], mv: u16) -> u8 {
         pids.iter()
             .find_map(|p| self.by_pid.get(p))
-            .map_or_else(|| generic_percent(mv), |c| c.percent(mv))
+            .map_or_else(|| pids.iter().find_map(|p| headset_percent(*p, mv)).unwrap_or_else(|| generic_percent(mv)), |c| c.percent(mv))
     }
 }
 
@@ -94,6 +94,33 @@ fn parse_curve(text: &str) -> Option<Curve> {
 }
 
 /// Generic Li-ion discharge curve (Solaar's approximation), linearly interpolated.
+/// Curvas embutidas de headsets que so informam a tensao, para quando o G HUB nao esta instalado.
+/// PRO X Wireless (0AAA / 0ABA): a tensao a cada 5% no modelo de energia do proprio G HUB
+/// (pro_x_wireless_headset_battery.xml), conferida contra o G HUB; a tabela do HeadsetControl lia
+/// 15 a 27 pontos abaixo. Os outros pela calibracao do HeadsetControl.
+/// (krisgfx9/Wireless-Device-Battery-Monitor, GPL-3.0, logitech.cpp, be819ea)
+fn headset_percent(pid: u16, mv: u16) -> Option<u8> {
+    const PROX_V: &[i32] = &[4102, 4046, 3993, 3950, 3915, 3877, 3838, 3809, 3789, 3772, 3758, 3747, 3736, 3722, 3707, 3687, 3661, 3644, 3548, 3426, 3293];
+    const PROX_P: &[i32] = &[100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0];
+    const GPRO_V: &[i32] = &[4150, 3830, 3780, 3740, 3670, 3320];
+    const GPRO_P: &[i32] = &[100, 50, 30, 20, 5, 0];
+    const G533_V: &[i32] = &[4200, 3850, 3790, 3750, 3680, 3330];
+    const G533_P: &[i32] = &[100, 50, 30, 20, 5, 0];
+    const G535_V: &[i32] = &[4175, 3817, 3766, 3730, 3664, 3310];
+    const G535_P: &[i32] = &[100, 50, 30, 20, 5, 0];
+    const G633_V: &[i32] = &[4100, 3950, 3850, 3750, 3650, 3500, 3300, 3150];
+    const G633_P: &[i32] = &[100, 80, 60, 40, 20, 10, 5, 0];
+    let (v, p) = match pid {
+        0x0AAA | 0x0ABA => (PROX_V, PROX_P),
+        0x0AA7 | 0x0AFB => (GPRO_V, GPRO_P),
+        0x0A66 => (G533_V, G533_P),
+        0x0AC4 => (G535_V, G535_P),
+        0x0A5C | 0x0A89 | 0x0A5B | 0x0A87 | 0x0AB5 | 0x0AFE => (G633_V, G633_P),
+        _ => return None,
+    };
+    Some(crate::drivers::interpolate(mv as i32, v, p) as u8)
+}
+
 fn generic_percent(mv: u16) -> u8 {
     const CURVE: [(u16, u8); 13] = [
         (4186, 100), (4067, 90), (3989, 80), (3922, 70), (3859, 60), (3811, 50), (3778, 40),

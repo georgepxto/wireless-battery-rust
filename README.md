@@ -93,25 +93,34 @@ These readers are ported from [krisgfx9/Wireless-Device-Battery-Monitor](https:/
 and use each vendor's own receiver protocol. Most of them have been verified on hardware by that
 project, but not yet with this app. Reports are welcome.
 
-- **Mice**: Kysona, Pulsar (including XS-1), ATK / VXE (Dragonfly R1 family), Hitscan, G-Wolves,
-  Glorious (Model O/D/I 2 and others), Lamzu, Endgame Gear, VAXEE, WLmouse, Ninjutso Sora V2,
-  Sprime PM1, MCHOSE mice, Dareu, Rapoo VT series, Redragon (Compx and Areson receivers),
-  Fantech Helios Go XD5, Motospeed X6, Delux M800 / M900, Attack Shark, Ajazz, Incott, Wraith W1,
-  RK MG6 Pro, ZOWIE EC-CW / DW / U2, ASUS ROG, Razer, SteelSeries (Aerox, Prime, Rival 3 / 650 / Pro),
-  Corsair Slipstream, Cooler Master MM712 / MM731.
+- **Mice**: Kysona, Pulsar (including XS-1), ATK / VXE (Dragonfly R1 family, ATK Zero, 8K Nano
+  dongle), Hitscan, G-Wolves, Glorious (Model O/D/I 2 and others), Lamzu, Endgame Gear, VAXEE,
+  WLmouse, Ninjutso Sora V2, Sprime PM1, MCHOSE (L7 / M7 / A7 / K7, A5 Pro / Pro Max, A5 V2 Ultra,
+  K7 V2 Ultra+ and the other Realtek / Nordic receivers), Dareu, Rapoo VT series, Redragon (Compx,
+  Areson, Evision and SinoWealth receivers, Invader Pro), Fantech Helios Go XD5 / Raigor III,
+  Motospeed X6, Delux M800 / M900, Attack Shark (including V6), Inphic IN10 MAX, Ajazz, Incott,
+  Wraith W1, RK MG6 Pro, ZOWIE EC-CW / DW / U2, ASUS ROG, Razer, SteelSeries (Aerox 3 / 5 / 9
+  including Gen 2 and special editions, Prime, Rival 3 / 650 / Pro), Corsair Slipstream and Sabre V2
+  Pro, Cooler Master MM712 / MM731, HyperX Pulsefire Haste 2 (Core / Mini), Akko V9 Dash Pro / Dash
+  V9 Ultra, Cherry XTRFY, Press Play ICARUS V2.
 - **Controllers on their own 2.4 GHz dongles** (XInput sees most of them as wired pads, so the
-  level is read from the vendor channel): GameSir Nova / Nova 2 / Nova Lite / Cyclone 2, Flydigi
-  Vader 5 Pro / Apex 5, 8BitDo Ultimate 2 / 2C / 3-mode / Pro 2 / Pro 3 / SN30 Pro / SF30 Pro,
-  BEITONG KP20 / KP40D, Steam Controller, and Switch Pro-compatible pads (while Steam Input is on).
+  level is read from the vendor channel): GameSir Nova / Nova 2 / Nova Lite / Cyclone 2 / Tarantula
+  Pro / NovaPro, Flydigi Vader 5 Pro / Apex 5, 8BitDo Ultimate 2 / 2C / 3-mode / Pro 2 / Pro 3 /
+  SN30 Pro / SF30 Pro, BEITONG KP20 / KP40D, Steam Controller, and Switch Pro-compatible pads (while
+  Steam Input is on).
 - **Anything else on USB** that reports its battery the standard HID way (a "Battery Strength" or
   "Absolute State Of Charge" field), read straight from the device's report descriptor.
-- **Keyboards**: AULA (more receivers), Keychron (classic, 8K, 4K, Nape), Rongyuan-based boards,
-  SONiX-based boards, Razer.
+- **Keyboards**: AULA (more receivers), MCHOSE (G75 V2, G87 V2, K99 V3, K87 V3), Keychron (classic,
+  8K, 4K, Nape), Rongyuan-based boards, SONiX-based boards (AJAZZ AK820 / AK980, EPOMAKER P75, RK R75,
+  Redragon K742B, Lofree Flow 2, NuPhy Air75 V2, NUT65, WEIKAV MAX102, Lemokey Link and others),
+  CHERRY MX 3.0S Wireless, ATK V75X, ATK Z87, VGN / VXE (S99, V98 Pro, N75 Pro, VXE75, V87), Feker
+  Alice80, Razer.
 - **Headsets**: Corsair (VOID family, VOID WIRELESS V2, VIRTUOSO, HS80 MAX), SteelSeries (Arctis 1,
-  7, 9, Pro Wireless, 7+, Nova 3P / 5 / 7 / Pro Wireless, GameBuds), MCHOSE X9,
-  HyperX (Cloud III, III S, II, II Core, Alpha, Alpha 2, Flight, Stinger Core),
-  Logitech G435 (`046D:0ADF` dongle), Sony INZONE (H9 II, H5, Buds), Jabra, JBL Quantum, Fractal
-  Scape, ASUS ROG.
+  7, 9, Pro Wireless, 7+, Nova 3P / 5 / 7 / Pro Wireless, GameBuds), MCHOSE X9 and V9 Pro 2,
+  HyperX (Cloud III, III S, II, II Core, Alpha, Alpha 2, Flight, Flight S, Flight for PS, Stinger
+  Core, Cloud Core Wireless DTS), Razer (BlackShark V2 HyperSpeed, V2 Pro 2020 / 2023, V3, V3 Pro,
+  V3 Pro for Xbox, V3 X, Barracuda X 2022), Audeze Maxwell / Maxwell 2, Logitech G435 (`046D:0ADF`
+  dongle), Sony INZONE (H9 II, H5, Buds), Jabra, JBL Quantum, Fractal Scape, ASUS ROG.
 
 ### Tested on real hardware
 

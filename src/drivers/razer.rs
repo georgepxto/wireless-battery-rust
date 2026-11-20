@@ -140,17 +140,20 @@ pub fn poll(ctx: &mut Ctx) {
                     }
                 }
             }
-            // Um mouse carregando aparece duas vezes (cabo + dongle): fica um so.
+            // Cabo e receptor podem mostrar o mesmo aparelho: fica um so, e uma leitura valida vence a do
+            // receptor sem o mouse (krisgfx9 db0e7cb).
             if !seen.contains(&name) {
                 seen.push(name);
                 ctx.add(s, vid, pid);
             } else {
                 ctx.claim(vid, pid);
-                if s.charging {
-                    for o in ctx.out.iter_mut().filter(|o| o.name.as_deref() == Some(name.as_str())) {
-                        if let State::Battery { charging, .. } = &mut o.state {
-                            *charging = true;
-                        }
+                let live = s.connected && s.percent >= 0;
+                let obs = s.into_observation();
+                if let Some(o) = ctx.out.iter_mut().find(|o| o.name.as_deref() == Some(name.as_str())) {
+                    match (&mut o.state, obs.state) {
+                        (State::Off | State::Unreachable, new) if live => o.state = new,
+                        (State::Battery { charging, .. }, State::Battery { charging: c, .. }) => *charging |= c,
+                        _ => {}
                     }
                 }
             }

@@ -1,7 +1,7 @@
 //! Headsets e mouses SteelSeries sem fio (VID 1038). Headsets pelo HeadsetControl, mouses pelo
 //! rivalcfg. Portado de krisgfx9/Wireless-Device-Battery-Monitor (GPL-3.0), steelseries.cpp.
 
-use super::{clamp100, hex4, map_to_100, read_until, Ctx, Status};
+use super::{clamp100, hex4, map_to_100, read_until, Ctx, Deadline, Status};
 use crate::device::Kind;
 use crate::hid::{DeviceInfo, HidDevice};
 
@@ -114,22 +114,71 @@ fn nova_family(d: &HidDevice, pid: u16) -> Option<(Status, bool)> {
     Some((s, false))
 }
 
-/// Aerox 3/5/9 Wireless, Prime Wireless: 92 (cabo) / D2 (sem fio) -> [1] = (nivel/5 + 1) | carregando<<7.
+/// Envia `cmd` e devolve o primeiro report que o ecoa. O SteelSeries GG manda os comandos dele na
+/// mesma interface e o receptor so responde ao ultimo, entao o pedido e reenviado a cada 100 ms
+/// dentro de 1 s. 40 FF = o receptor nao alcanca o mouse (desligado): desiste na hora.
+fn query_echo(d: &HidDevice, cmd: u8, min_len: usize) -> Option<Vec<u8>> {
+    d.flush();
+    let end = Deadline::in_ms(1000);
+    while !end.expired() {
+        d.write(&[0x00, cmd]).ok()?;
+        let resend = Deadline::in_ms(100);
+        while !resend.expired() && !end.expired() {
+            let Some(r) = d.read(resend.left().min(end.left())) else { break };
+            if r.len() >= min_len && r[0] == cmd {
+                return Some(r);
+            }
+            if r.len() >= 2 && r[0] == 0x40 && r[1] == 0xFF {
+                return None;
+            }
+        }
+    }
+    None
+}
+
+/// Familia Aerox / Prime Wireless na interface 3: 92 no cabo, D2 pelo receptor. Dois formatos:
+/// - degraus: [1] = (nivel/5 + 1) | carregando<<7; 00 = mouse desligado ou dormindo;
+/// - porcentagem (Aerox 3 Wireless Gen 2): [1] 00 bateria, 01 carregando, 02 cheio no cabo;
+///   [2] = 0..100 ou FF enquanto nao mediu.
+///
+/// Mouse desligado fica de fora: o app mantem o ultimo nivel. Cabo e receptor usam a mesma chave
+/// (o PID do receptor), entao o mouse aparece uma vez so. (krisgfx9 d74ca56)
+///
+/// (pid, pid do receptor, nome, cabo, formato em porcentagem)
+const AEROX: &[(u16, u16, &str, bool, bool)] = &[
+    (0x1838, 0x1838, "SteelSeries Aerox 3 Wireless", false, false),
+    (0x183A, 0x1838, "SteelSeries Aerox 3 Wireless", true, false),
+    (0x1878, 0x1878, "SteelSeries Aerox 3 Wireless CS2 Dragon Lore Edition", false, false),
+    (0x187A, 0x1878, "SteelSeries Aerox 3 Wireless CS2 Dragon Lore Edition", true, false),
+    (0x1890, 0x1890, "SteelSeries Aerox 3 Wireless Gen 2", false, true),
+    (0x1892, 0x1890, "SteelSeries Aerox 3 Wireless Gen 2", true, true),
+    (0x1852, 0x1852, "SteelSeries Aerox 5 Wireless", false, false),
+    (0x1854, 0x1852, "SteelSeries Aerox 5 Wireless", true, false),
+    (0x1858, 0x1858, "SteelSeries Aerox 9 Wireless", false, false),
+    (0x185A, 0x1858, "SteelSeries Aerox 9 Wireless", true, false),
+    (0x1840, 0x1840, "SteelSeries Prime Wireless", false, false),
+    (0x1842, 0x1840, "SteelSeries Prime Wireless", true, false),
+    (0x1860, 0x1860, "SteelSeries Aerox 5 Wireless Diablo IV Edition", false, false),
+];
+
 fn aerox(d: &HidDevice, pid: u16) -> Option<(Status, bool)> {
-    let wired = matches!(pid, 0x183A | 0x1854 | 0x185A | 0x1842);
-    let r = write_read(d, &[0x00, if wired { 0x92 } else { 0xD2 }], 300).filter(|r| r.len() >= 2)?;
-    let name = match pid {
-        0x1838 | 0x183A => "SteelSeries Aerox 3 Wireless",
-        0x1852 | 0x1854 => "SteelSeries Aerox 5 Wireless",
-        0x1858 | 0x185A => "SteelSeries Aerox 9 Wireless",
-        _ => "SteelSeries Prime Wireless",
-    };
-    let mut s = mouse(pid, name);
-    let raw = (r[1] & 0x7F) as i32;
-    if raw == 0 {
-        s.connected = false;
-    } else if raw <= 21 {
-        s.percent = (raw - 1) * 5;
+    let &(_, receiver, name, wired, percent) = AEROX.iter().find(|m| m.0 == pid)?;
+    let r = query_echo(d, if wired { 0x92 } else { 0xD2 }, if percent { 3 } else { 2 })?;
+    if percent && r[1] > 0x02 {
+        return None;
+    }
+    let off = if percent { !wired && r[1] == 0 && r[2] == 0 } else { r[1] & 0x7F == 0 };
+    if off {
+        return None;
+    }
+    let mut s = mouse(receiver, name);
+    if percent {
+        s.charging = r[1] != 0;
+        if r[2] <= 100 {
+            s.percent = r[2] as i32;
+        }
+    } else if r[1] & 0x7F <= 21 {
+        s.percent = ((r[1] & 0x7F) as i32 - 1) * 5;
         s.charging = r[1] & 0x80 != 0;
     }
     Some((s, wired))
@@ -193,7 +242,7 @@ const MODELS: &[(&[u16], Accept, Poll)] = &[
         ffc0,
         nova_family,
     ),
-    (&[0x1838, 0x183A, 0x1852, 0x1854, 0x1858, 0x185A, 0x1840, 0x1842], |c| iface(c, 3), aerox),
+    (&[0x1838, 0x183A, 0x1878, 0x187A, 0x1890, 0x1892, 0x1852, 0x1854, 0x1858, 0x185A, 0x1840, 0x1842, 0x1860], |c| iface(c, 3), aerox),
     (&[0x1830, 0x1872], |c| iface(c, 3), rival),
     (&[0x172B, 0x1726], |c| iface(c, 0), rival),
     (&[0x1880], |c| iface(c, 2), rival_pro),

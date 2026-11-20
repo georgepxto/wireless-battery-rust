@@ -15,18 +15,23 @@ use crate::hid::{DeviceInfo, HidApi, HidDevice, Mode};
 type Poll = fn(&mut Ctx);
 
 const ORDER: &[(&str, Poll)] = &[
+    ("sinowealth", misc_new::poll_sinowealth),
     ("glorious", glorious::poll),
     ("aula", aula::poll),
     ("dareu", dareu::poll),
+    ("atk_keyboard", evision::poll_atk_keyboard),
+    ("redragon_evision", misc_new::poll_redragon_evision),
     ("pulsar", pulsar::poll),
     ("atk", atk::poll),
     ("kysona", kysona::poll),
+    ("cherry", evision::poll_cherry),
     ("keychron", keychron::poll),
     ("lamzu", lamzu::poll),
     ("endgame", endgame::poll),
     ("vaxee", vaxee::poll),
     ("wlmouse", wlmouse::poll),
     ("nordic", nordic::poll),
+    ("akko", evision::poll_akko),
     ("rongyuan", rongyuan::poll),
     ("sonix", sonix::poll),
     ("inzone", inzone::poll),
@@ -37,15 +42,22 @@ const ORDER: &[(&str, Poll)] = &[
     ("zowie", zowie::poll),
     ("rk", rk::poll),
     ("mchose_mouse", mchose_mouse::poll),
+    ("mchose_a5", mchose_new::poll_a5),
     ("rapoo", rapoo::poll),
     ("areson", areson::poll),
     ("mchose_g3", mchose_mouse::poll_g3),
+    ("mchose_modern", mchose_new::poll_modern),
+    ("mchose_headset", mchose_new::poll_headset),
+    ("mchose_keyboard", mchose_new::poll_keyboard),
     ("misc_mice", misc_mice::poll),
     ("fantech", fantech::poll),
+    ("raigor", misc_new::poll_raigor),
+    ("razer_headset", razer_headset::poll),
     ("hyperx", hyperx::poll),
     ("logitech_g435", logitech_g435::poll),
     ("razer", razer::poll),
     ("steelseries", steelseries::poll),
+    ("audeze", audeze::poll),
     ("corsair", corsair::poll),
     ("coolermaster", coolermaster::poll),
     ("switch_pro", switch_pro::poll),
@@ -54,6 +66,7 @@ const ORDER: &[(&str, Poll)] = &[
     ("flydigi", flydigi::poll),
     ("eightbitdo", eightbitdo::poll),
     ("beitong", beitong::poll),
+    ("pressplay", misc_new::poll_pressplay),
     ("generic", generic::poll),
 ];
 
@@ -82,11 +95,13 @@ pub mod gamesir;
 pub mod steam_controller;
 pub mod switch_pro;
 pub mod atk;
+pub mod audeze;
 pub mod coolermaster;
 pub mod corsair;
 pub mod aula;
 pub mod dareu;
 pub mod endgame;
+pub mod evision;
 pub mod fantech;
 pub mod fractal;
 pub mod generic;
@@ -100,11 +115,14 @@ pub mod kysona;
 pub mod lamzu;
 pub mod logitech_g435;
 pub mod mchose_mouse;
+pub mod mchose_new;
 pub mod misc_mice;
+pub mod misc_new;
 pub mod nordic;
 pub mod pulsar;
 pub mod rapoo;
 pub mod razer;
+pub mod razer_headset;
 pub mod rk;
 pub mod rog;
 pub mod rongyuan;

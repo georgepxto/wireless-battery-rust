@@ -50,9 +50,49 @@ fn cloud2_kingston(d: &HidDevice, pid: u16) -> Option<Status> {
         query(d, &req, 1000, |r| r.len() >= 8 && r[0] == 0x0B && r[2] == 0xBB && r[3] == cmd)
     };
     let r = q(0x02).filter(|r| r[7] <= 100)?;
-    let mut s = base(pid, "HyperX Cloud II Wireless");
+    let mut s = base(pid, if pid == 0x16EA || pid == 0x16EB { "HyperX Cloud Flight S" } else { "HyperX Cloud II Wireless" });
     s.percent = r[7] as i32;
     s.charging = q(0x03).is_some_and(|r| r[4] == 1);
+    Some(s)
+}
+
+/// Pulsefire Haste 2 (Core / Mini) Wireless: o mesmo par 52 01 / 50 02 do Cloud Alpha 2, na colecao do
+/// fabricante do dongle. Depois de religar o dongle inunda o canal, entao sem resposta de link quem decide
+/// e a consulta de bateria. Por uns 5 s depois de ligar o mouse informa 40% em vez do nivel real: uma
+/// leitura nessa janela nao vale. (ngenuity-linux-cli; conferido no repo do krisgfx9)
+fn haste_wireless(d: &HidDevice, pid: u16) -> Option<Status> {
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+    static LINK_UP: Mutex<(Option<Instant>, bool)> = Mutex::new((None, false));
+    let q = |cmd: u8, sub: u8| query(d, &[cmd, sub], 1000, |r| r.len() >= 8 && r[0] == cmd + 1 && r[1] == sub);
+    let link = q(0x52, 0x01);
+    let linked = link.as_ref().is_none_or(|r| r[2] != 0);
+    let battery = if linked { q(0x50, 0x02).filter(|r| r[2] <= 100) } else { None };
+    if link.is_none() && battery.is_none() {
+        return None;
+    }
+    let settle = Duration::from_secs(6);
+    let mut g = LINK_UP.lock().unwrap();
+    if !linked {
+        g.0 = None;
+    } else if g.0.is_none() {
+        // Na primeira leitura do app, o mouse ja estava ligado ha tempo.
+        g.0 = Some(if g.1 { Instant::now() } else { Instant::now().checked_sub(settle).unwrap_or_else(Instant::now) });
+    }
+    g.1 = true;
+    let settled = g.0.is_some_and(|t| t.elapsed() >= settle);
+    drop(g);
+    let name = match pid {
+        0x0AB5 => "HyperX Pulsefire Haste 2 Core Wireless",
+        0x0DA0 => "HyperX Pulsefire Haste 2 Mini",
+        _ => "HyperX Pulsefire Haste 2 Wireless",
+    };
+    let mut s = Status::new(format!("hyperx:{}", hex4(pid)), name, Kind::Mouse);
+    s.connected = linked;
+    if let Some(r) = battery.filter(|_| settled) {
+        s.percent = r[2] as i32;
+        s.charging = r[3] == 1 || r[3] == 2;
+    }
     Some(s)
 }
 
@@ -127,7 +167,8 @@ fn stinger_core(d: &HidDevice, pid: u16) -> Option<Status> {
     const PCT: [i32; 11] = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0];
     const CHARGING_MV: [i32; 11] = [4130, 4090, 4050, 4000, 3967, 3946, 3930, 3916, 3871, 3831, 3400];
     const DISCHARGING_MV: [i32; 11] = [4121, 4042, 3954, 3905, 3838, 3785, 3763, 3738, 3700, 3651, 3517];
-    let ps = pid == 0x0A93;
+    // Receptores PlayStation (03F0:0A93, 0951:1713), DTS (03F0:0A8E) e Cloud Core Wireless DTS (0951:173F).
+    let ps = matches!(pid, 0x0A93 | 0x1713 | 0x173F | 0x0A8E);
     let exchange = |cmd: &[u8], good: fn(&[u8]) -> bool| -> (bool, Option<Vec<u8>>) {
         if d.send_feature_report(cmd).is_err() {
             return (false, None);
@@ -152,7 +193,14 @@ fn stinger_core(d: &HidDevice, pid: u16) -> Option<Status> {
         (false, Some(r)) if ps => r, // cabecalho nao documentado: depois de 10 leituras usa a ultima
         _ => return None,
     };
-    let mut s = base(pid, "HyperX Cloud Stinger Core Wireless");
+    let mut s = base(
+        pid,
+        match pid {
+            0x173F => "HyperX Cloud Core Wireless",
+            0x0A8E => "HyperX Cloud Stinger Core Wireless DTS",
+            _ => "HyperX Cloud Stinger Core Wireless",
+        },
+    );
     s.connected = r[11] == 0x01;
     if !s.connected {
         return Some(s);
@@ -176,14 +224,16 @@ const MODELS: &[(u16, &[u16], Accept, Poll, bool)] = &[
     (0x03F0, &[0x05B7, 0x0C9D], |c| c.output_len() == 62 && c.input_len() == 62, cloud3, false),
     (0x03F0, &[0x069F, 0x0995], |c| c.usage_page() >= 0xFF00 && c.output_len() >= 62 && c.input_len() >= 62, cloud3, false),
     (0x03F0, &[0x06BE, 0x02CC], |c| c.output_len() == 64 && c.input_len() == 64, cloud3s, false),
-    (0x03F0, &[0x0696, 0x018B, 0x0D93], |c| c.usage_page() == 0xFF90 && c.usage() == 0x0303, cloud2, false),
+    (0x03F0, &[0x0696, 0x018B, 0x0D93, 0x0C8C], |c| c.usage_page() == 0xFF90 && c.usage() == 0x0303, cloud2, false), // 0C8C: Cloud Flight for PS
     (0x0951, &[0x1718], |c| c.output_len() == 62, cloud2_kingston, false),
+    (0x0951, &[0x16EA, 0x16EB], |c| c.usage_page() == 0xFF13 && c.usage() == 1 && c.input_len() == 62 && c.output_len() == 62, cloud2_kingston, false), // Cloud Flight S
     (0x03F0, &[0x098D], |c| c.usage_page() >= 0xFF00 && c.output_len() >= 3, cloud_alpha, false),
     (0x03F0, &[0x08BE], |c| c.usage_page() == 0xFF13 && c.usage() == 0xFF00, cloud_alpha2, false),
+    (0x03F0, &[0x0AB5, 0x0D97, 0x0F98, 0x0DA0], |c| c.usage_page() >= 0xFF00 && c.output_len() >= 2 && c.input_len() >= 8, haste_wireless, false),
     (0x0951, &[0x16C4, 0x1723, 0x1749], |c| c.usage_page() >= 0xFF00 && c.output_len() >= 3, cloud_flight, false),
     (0x03F0, &[0x0E90], |c| c.usage_page() >= 0xFF00 && c.output_len() >= 3, cloud_flight, false),
-    (0x03F0, &[0x0A93], |c| c.usage_page() == 0xFF00 && c.usage() == 0x0001 && c.feature_len() >= 32, stinger_core, true),
-    (0x0951, &[0x170B], |c| c.usage_page() == 0xFF00 && c.usage() == 0x0001 && c.feature_len() >= 32, stinger_core, true),
+    (0x03F0, &[0x0A93, 0x0A8E], |c| c.usage_page() == 0xFF00 && c.usage() == 0x0001 && c.feature_len() >= 32, stinger_core, true),
+    (0x0951, &[0x170B, 0x1713, 0x173F], |c| c.usage_page() == 0xFF00 && c.usage() == 0x0001 && c.feature_len() >= 32, stinger_core, true),
 ];
 
 pub fn poll(ctx: &mut Ctx) {

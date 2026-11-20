@@ -36,7 +36,8 @@ fn parse(r: &[u8]) -> Option<Reply> {
 
 pub fn poll(ctx: &mut Ctx) {
     for (vid, pid) in ctx.products(0x25A7) {
-        if pid != 0xFA7B && pid != 0xFA7C {
+        // FA7E: Redragon Invader Pro, mesmo protocolo com o nivel em dezenas.
+        if pid != 0xFA7B && pid != 0xFA7C && pid != 0xFA7E {
             continue;
         }
         let all = ctx.find(vid, pid, |_| true);
@@ -78,8 +79,13 @@ pub fn poll(ctx: &mut Ctx) {
             remember(c);
         }
         let Some(r) = found else { continue };
-        let mut s = Status::new(format!("fantech:{}", hex4(pid)), "Fantech Helios Go XD5", Kind::Mouse);
-        s.percent = r.pct;
+        let redragon = pid == 0xFA7E;
+        let mut s = if redragon {
+            Status::new(format!("redragon:{}", hex4(pid)), "Redragon Invader Pro", Kind::Mouse)
+        } else {
+            Status::new(format!("fantech:{}", hex4(pid)), "Fantech Helios Go XD5", Kind::Mouse)
+        };
+        s.percent = if redragon { super::clamp100(r.pct * 10) } else { r.pct };
         s.charging = r.charging;
         ctx.add(s, vid, pid);
         break;

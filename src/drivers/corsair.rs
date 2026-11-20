@@ -119,8 +119,62 @@ impl Bragi {
     }
 }
 
+/// Mouses Corsair no protocolo CompX de 17 bytes (report 08, colecao FF02:0002): 03 = link,
+/// 04 = bateria ([6] %, [7] carregando). (HaloBattery; krisgfx9 corsair.cpp)
+const COMPX: &[(u16, &str)] = &[(0x2B2A, "Corsair Sabre V2 Pro Ultralight"), (0x2B34, "Corsair Sabre v2 PRO WIRELESS MG")];
+
+fn compx_query(d: &HidDevice, cmd: u8) -> Option<Vec<u8>> {
+    d.flush();
+    d.write(&super::kysona::request(cmd)).ok()?;
+    let end = Deadline::in_ms(500);
+    while !end.expired() {
+        let r = d.read(end.left()).filter(|r| r.len() >= 17)?;
+        if r[0] == 0x08 && r[1] == cmd && r[16] == super::kysona::checksum(&r[..16]) {
+            return Some(r);
+        }
+    }
+    None
+}
+
+fn poll_compx(ctx: &mut Ctx, vid: u16, pid: u16, name: &str) {
+    for c in ctx.find(vid, pid, |c| c.usage_page() == 0xFF02 && c.usage() == 0x0002 && c.output_len() >= 17 && c.input_len() >= 17) {
+        let Some(d) = ctx.open(&c) else { continue };
+        let mut s = Status::new(format!("corsair:{}", hex4(pid)), name, Kind::Mouse);
+        let mut answered = false;
+        if let Some(r) = compx_query(&d, 0x03) {
+            answered = true;
+            s.connected = r[6] != 0;
+        }
+        if !answered || s.connected {
+            if let Some(r) = compx_query(&d, 0x04) {
+                answered = true;
+                s.connected = true;
+                if r[6] <= 100 {
+                    s.percent = r[6] as i32;
+                }
+                s.charging = r[7] != 0;
+            } else if answered {
+                s.asleep = true;
+            }
+        }
+        if !answered {
+            continue;
+        }
+        if s.connected {
+            ctx.add(s, vid, pid);
+        } else {
+            ctx.claim(vid, pid);
+        }
+        return;
+    }
+}
+
 pub fn poll(ctx: &mut Ctx) {
     for (vid, pid) in ctx.products(VID) {
+        if let Some(&(_, name)) = COMPX.iter().find(|m| m.0 == pid) {
+            poll_compx(ctx, vid, pid, name);
+            continue;
+        }
         if VOID_PIDS.contains(&pid) {
             for c in ctx.find(vid, pid, |c| (c.usage_page() == 0xFFC5 || c.usage_page() == 0xFF00) && c.output_len() > 0) {
                 if let Some(s) = poll_void(ctx, &c) {

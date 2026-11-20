@@ -51,7 +51,12 @@ struct Xenta {
 static XENTA: Mutex<Option<HashMap<String, Xenta>>> = Mutex::new(None);
 
 const XENTA_MODELS: &[(u8, &str, bool)] = &[
+    (0x73, "Inphic IN10R MAX", false),
+    (0x74, "Inphic IN10 MAX", false),
     (0x3D, "Delux M900 Pro", false),
+    (0x30, "Delux M900 Pro", false),
+    (0x50, "Delux M900 Pro", false),
+    (0x24, "Attack Shark V6", false),
     (0x55, "Attack Shark X11", false),
     (0x4E, "Attack Shark X3 Max", false),
     (0xE5, "Attack Shark V3 Pro", false),
@@ -62,7 +67,7 @@ fn poll_xenta(ctx: &mut Ctx) {
     let mut guard = XENTA.lock().unwrap();
     let listeners = guard.get_or_insert_with(HashMap::new);
     let mut present = Vec::new();
-    for pid in [0xFA60u16, 0xFA65, 0xFA55, 0x2155] {
+    for pid in [0xFA60u16, 0xFA61, 0xFA65, 0xFA55, 0x2155] {
         if ctx.is_claimed(0x1D57, pid) {
             continue;
         }
@@ -88,7 +93,8 @@ fn poll_xenta(ctx: &mut Ctx) {
                     30
                 };
                 let Some(r) = l.dev.read(wait).filter(|r| r.len() >= 5) else { break };
-                if r[0] != 0x03 || r[2] != 0x40 {
+                // Byte 2 e 40 ou 41 (Attack Shark V6, Delux M900 Pro modelo 50, Inphic).
+                if r[0] != 0x03 || (r[2] != 0x40 && r[2] != 0x41) {
                     continue;
                 }
                 l.prev = std::mem::replace(&mut l.last, r[..5].to_vec());
@@ -103,7 +109,19 @@ fn poll_xenta(ctx: &mut Ctx) {
             let model = XENTA_MODELS.iter().find(|m| m.0 == code);
             let mut s = Status::new(format!("xenta:{}", hex4(pid)), model.map_or("Wireless mouse", |m| m.1), Kind::Mouse);
             let agreed = l.prev == l.last;
-            if cable || st == 0x02 || st == 0x03 {
+            let delux = pid == 0xFA65 && (code == 0x30 || code == 0x50);
+            if delux {
+                if st == 0x02 {
+                    s.percent = 100;
+                } else if st == 0x03 {
+                    s.charging = true;
+                    if level <= 100 {
+                        s.percent = level as i32;
+                    }
+                } else if agreed && st == 0x01 && (1..=100).contains(&level) {
+                    s.percent = level as i32;
+                }
+            } else if cable || st == 0x02 || st == 0x03 {
                 s.charging = true; // o nivel congela na energia externa
                 if st == 0x02 && !cable {
                     s.percent = 100;

@@ -7,6 +7,8 @@
 //! - Resposta lida de volta: [12][F9][payload invertido] = vid:u16, modelo:u16, firmware:u32,
 //!   flags:u8 (09 no receptor, 00 no cabo), nivel:u8, carregando:u8.
 //! - Mouse dormindo: o receptor ecoa o comando com payload zerado.
+//! - O mesmo protocolo roda nos dongles Realtek de VID 3837 (A5 V2 Ultra 3837:100C, A7 V2 Ultra+
+//!   100B, 1001 / 100A / 1012); o campo de VID responde 41E4 ou 3837 neles.
 //!
 //! G3 V2 (protocolo de Jstdi001/MCHOSE-Monitor, MIT): output [00][55 30 A5 0B 2E 01 01 01],
 //! resposta [AA 30 .. .. .. .. .. .. nivel carregando].
@@ -19,7 +21,7 @@ const REPORT: u8 = 0x12;
 const CMD_STATUS: u8 = 0x06;
 
 /// 1 = leitura, 0 = eco com payload vazio (dormindo), -1 = outra coisa.
-pub fn parse_status(r: &[u8]) -> (i32, u8, u8, u8) {
+pub fn parse_status(r: &[u8], vid_fields: [u16; 2]) -> (i32, u8, u8, u8) {
     if r.len() < 13 || r[0] != REPORT || r[1] != CMD_STATUS ^ 0xFF {
         return (-1, 0, 0, 0);
     }
@@ -27,14 +29,14 @@ pub fn parse_status(r: &[u8]) -> (i32, u8, u8, u8) {
     if p.iter().all(|b| *b == 0) {
         return (0, 0, 0, 0);
     }
-    if u16::from_le_bytes([p[0], p[1]]) != VID || p[9] > 100 {
+    if !vid_fields.contains(&u16::from_le_bytes([p[0], p[1]])) || p[9] > 100 {
         return (-1, 0, 0, 0);
     }
     (1, p[9], p[10], p[8])
 }
 
-pub fn poll(ctx: &mut Ctx) {
-    for (vid, pid) in ctx.products(VID) {
+fn poll_product(ctx: &mut Ctx, vid: u16, pid: u16, vid_fields: [u16; 2]) {
+    {
         for c in ctx.find(vid, pid, |c| c.usage_page() == 0xFF01 && c.usage() == 0x0001 && c.feature_len() >= 65) {
             let Some(d) = ctx.open_feature_only(&c) else { continue };
             let mut req = vec![0xFFu8; c.feature_len() as usize];
@@ -53,7 +55,7 @@ pub fn poll(ctx: &mut Ctx) {
                 }
                 sleep_ms(120);
                 let Some(r) = d.get_feature(REPORT) else { continue };
-                let (st, l, ch, fl) = parse_status(&r);
+                let (st, l, ch, fl) = parse_status(&r, vid_fields);
                 if st > state {
                     (state, level, charging, flags) = (st, l, ch, fl);
                 }
@@ -72,6 +74,21 @@ pub fn poll(ctx: &mut Ctx) {
             }
             ctx.add(s, vid, pid);
             break;
+        }
+    }
+}
+
+/// Dongles Realtek 3837 com o mesmo protocolo; explicitos, para teclados e o G3 V2 (mesmo VID,
+/// outros protocolos) nunca receberem este comando.
+const REALTEK_PIDS: &[u16] = &[0x100C, 0x100B, 0x100A, 0x1001, 0x1012];
+
+pub fn poll(ctx: &mut Ctx) {
+    for (vid, pid) in ctx.products(VID) {
+        poll_product(ctx, vid, pid, [VID, VID]);
+    }
+    for &pid in REALTEK_PIDS {
+        if !ctx.is_claimed(0x3837, pid) {
+            poll_product(ctx, 0x3837, pid, [0x41E4, 0x3837]);
         }
     }
 }
@@ -123,9 +140,9 @@ mod tests {
         let payload = [0x53, 0x52, 0x20, 0x10, 0, 0, 0, 0, 0x09, 77, 0];
         let mut r = vec![REPORT, CMD_STATUS ^ 0xFF];
         r.extend(payload.iter().map(|b| b ^ 0xFF));
-        assert_eq!(parse_status(&r), (1, 77, 0, 9));
+        assert_eq!(parse_status(&r, [VID, VID]), (1, 77, 0, 9));
         let mut asleep = vec![REPORT, CMD_STATUS ^ 0xFF];
         asleep.extend([0xFFu8; 11]);
-        assert_eq!(parse_status(&asleep).0, 0);
+        assert_eq!(parse_status(&asleep, [VID, VID]).0, 0);
     }
 }
