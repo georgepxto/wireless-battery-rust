@@ -115,13 +115,13 @@ pub fn poll_wired(ctx: &mut Ctx) {
     if ctx.is_claimed(WIRED.0, WIRED.1) {
         return;
     }
-    let present = ctx.find(WIRED.0, WIRED.1, |c| c.product_string().unwrap_or("").contains("BY Tech")).first().is_some();
+    let present = !ctx.find(WIRED.0, WIRED.1, |c| c.product_string().unwrap_or("").contains("BY Tech")).is_empty();
     if !present {
         return;
     }
-    let dongle = ctx.find(0x3554, 0xFA09, |_| true).first().is_some();
-    let (key, name) = if dongle { ("aula:3554:FA09".to_string(), "AULA F75") } else { (format!("aula:{}:{}", hex4(WIRED.0), hex4(WIRED.1)), "AULA F75") };
-    let mut s = Status::new(key, name, Kind::Keyboard);
+    let dongle = !ctx.find(0x3554, 0xFA09, |_| true).is_empty();
+    let key = if dongle { "aula:3554:FA09".to_string() } else { format!("aula:{}:{}", hex4(WIRED.0), hex4(WIRED.1)) };
+    let mut s = Status::new(key, "AULA F75", Kind::Keyboard);
     s.charging = true;
     ctx.add(s, WIRED.0, WIRED.1);
     if dongle {
