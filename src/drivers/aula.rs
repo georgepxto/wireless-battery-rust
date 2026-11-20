@@ -126,6 +126,9 @@ pub fn poll(ctx: &mut Ctx) {
             let model = if generic { identify_model(&d) } else { None };
             let mchose = vid == 0x41E4 || model.is_some();
             let Some(r) = exchange(&d, CMD_BATTERY, 4000) else { continue };
+            if crate::verbose() {
+                eprintln!("[aula {}:{}] resposta: {:02X?}", hex4(vid), hex4(pid), &r[..LEN.min(r.len())]);
+            }
             let level = r[5] as i32;
             if !(1..=100).contains(&level) {
                 continue;
