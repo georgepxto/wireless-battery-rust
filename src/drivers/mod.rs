@@ -16,6 +16,7 @@ type Poll = fn(&mut Ctx);
 
 const ORDER: &[(&str, Poll)] = &[
     ("sinowealth", misc_new::poll_sinowealth),
+    ("aula_wired", aula::poll_wired), // antes do Glorious, que tambem usa o VID 258A
     ("glorious", glorious::poll),
     ("aula", aula::poll),
     ("dareu", dareu::poll),

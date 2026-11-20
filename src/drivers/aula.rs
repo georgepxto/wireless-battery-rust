@@ -107,6 +107,28 @@ fn identify_model(d: &HidDevice) -> Option<&'static str> {
     [5usize, 4].iter().find_map(|&off| MODELS.iter().find(|(code, _)| r.get(off..off + 6) == Some(&code[..])).map(|(_, n)| *n))
 }
 
+/// AULA F75 no modo USB (com fio): larga o dongle e aparece como 258A:010C "BY Tech Gaming Keyboard".
+/// No cabo ele esta sempre carregando e nao informa o nivel; com o dongle ligado fica a mesma entrada.
+const WIRED: (u16, u16) = (0x258A, 0x010C);
+
+pub fn poll_wired(ctx: &mut Ctx) {
+    if ctx.is_claimed(WIRED.0, WIRED.1) {
+        return;
+    }
+    let present = ctx.find(WIRED.0, WIRED.1, |c| c.product_string().unwrap_or("").contains("BY Tech")).first().is_some();
+    if !present {
+        return;
+    }
+    let dongle = ctx.find(0x3554, 0xFA09, |_| true).first().is_some();
+    let (key, name) = if dongle { ("aula:3554:FA09".to_string(), "AULA F75") } else { (format!("aula:{}:{}", hex4(WIRED.0), hex4(WIRED.1)), "AULA F75") };
+    let mut s = Status::new(key, name, Kind::Keyboard);
+    s.charging = true;
+    ctx.add(s, WIRED.0, WIRED.1);
+    if dongle {
+        ctx.claim(0x3554, 0xFA09); // o dongle nao alcanca o teclado no modo USB
+    }
+}
+
 pub fn poll(ctx: &mut Ctx) {
     for (vid, pid) in RECEIVERS {
         if ctx.is_claimed(vid, pid) {
