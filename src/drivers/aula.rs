@@ -107,7 +107,7 @@ fn identify_model(d: &HidDevice) -> Option<&'static str> {
     [5usize, 4].iter().find_map(|&off| MODELS.iter().find(|(code, _)| r.get(off..off + 6) == Some(&code[..])).map(|(_, n)| *n))
 }
 
-/// AULA F75 no modo USB (com fio): larga o dongle e aparece como 258A:010C "BY Tech Gaming Keyboard".
+/// AULA F75 no modo USB (com fio): larga o dongle e aparece como 258A:010C (BY Tech, "Gaming Keyboard").
 /// No cabo ele esta sempre carregando e nao informa o nivel; com o dongle ligado fica a mesma entrada.
 const WIRED: (u16, u16) = (0x258A, 0x010C);
 
@@ -115,7 +115,8 @@ pub fn poll_wired(ctx: &mut Ctx) {
     if ctx.is_claimed(WIRED.0, WIRED.1) {
         return;
     }
-    let present = !ctx.find(WIRED.0, WIRED.1, |c| c.product_string().unwrap_or("").contains("BY Tech")).is_empty();
+    // Fabricante "BY Tech", produto "Gaming Keyboard".
+    let present = !ctx.find(WIRED.0, WIRED.1, |c| c.manufacturer_string().unwrap_or("").contains("BY Tech")).is_empty();
     if !present {
         return;
     }
